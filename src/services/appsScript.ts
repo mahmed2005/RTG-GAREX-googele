@@ -550,15 +550,30 @@ function createJsonResponse(data) {
 }
 `;
 
+export const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxqUFaY0IWsIkYPkzMsEuN9pbEmbBz2jhus8D5hKwg5/exec';
+export const DEFAULT_DEV_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxqUFaY0IWsIkYPkzMsEuN9pbEmbBz2jhus8D5hKwg5/dev';
+
 export class AppsScriptService {
   public static getConfig(): AppsScriptConfig {
     try {
       const saved = localStorage.getItem(APPS_SCRIPT_CONFIG_KEY);
-      return saved
-        ? JSON.parse(saved)
-        : { webAppUrl: '', autoFetchOnLoad: true, lastSyncedAt: null };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.webAppUrl && parsed.webAppUrl.trim()) {
+          return parsed;
+        }
+      }
+      return { 
+        webAppUrl: DEFAULT_APPS_SCRIPT_URL, 
+        autoFetchOnLoad: true, 
+        lastSyncedAt: null 
+      };
     } catch {
-      return { webAppUrl: '', autoFetchOnLoad: true, lastSyncedAt: null };
+      return { 
+        webAppUrl: DEFAULT_APPS_SCRIPT_URL, 
+        autoFetchOnLoad: true, 
+        lastSyncedAt: null 
+      };
     }
   }
 
@@ -573,8 +588,8 @@ export class AppsScriptService {
    * Helper to send JSON payload via POST (avoid preflight issues)
    */
   private static async sendPost(webAppUrl: string, body: any): Promise<any> {
-    if (!webAppUrl || !webAppUrl.trim()) return null;
-    const cleanUrl = webAppUrl.trim();
+    const targetUrl = webAppUrl && webAppUrl.trim() ? webAppUrl.trim() : DEFAULT_APPS_SCRIPT_URL;
+    const cleanUrl = targetUrl;
 
     try {
       const res = await fetch(cleanUrl, {
@@ -613,7 +628,7 @@ export class AppsScriptService {
   /**
    * Fetch all store items live from Google Apps Script Web App
    */
-  public static async fetchStoreData(webAppUrl: string): Promise<{
+  public static async fetchStoreData(webAppUrl?: string): Promise<{
     products: Product[];
     pubgAccounts: PubgAccount[];
     allPubgAccounts?: PubgAccount[];
@@ -621,28 +636,58 @@ export class AppsScriptService {
     ucPackages: UcPackage[];
     settings?: Partial<StoreSettings>;
   }> {
-    if (!webAppUrl || !webAppUrl.trim()) {
-      throw new Error('يرجى إدخال رابط Google Apps Script Web App أولاً');
+    const inputUrl = (webAppUrl && webAppUrl.trim()) ? webAppUrl.trim() : DEFAULT_APPS_SCRIPT_URL;
+    
+    // Prepare candidate URLs (support both /exec and /dev seamlessly)
+    const urlsToTry: string[] = [];
+    urlsToTry.push(inputUrl);
+
+    if (inputUrl.endsWith('/dev')) {
+      urlsToTry.push(inputUrl.replace(/\/dev$/, '/exec'));
+    } else if (inputUrl.endsWith('/exec')) {
+      urlsToTry.push(inputUrl.replace(/\/exec$/, '/dev'));
     }
 
-    const cleanUrl = webAppUrl.trim();
-    const url = cleanUrl.includes('?') ? `${cleanUrl}&action=get_all` : `${cleanUrl}?action=get_all`;
+    let lastError: any = null;
 
-    const res = await fetch(url, {
-      method: 'GET',
-    });
+    for (const testUrl of urlsToTry) {
+      try {
+        const fullUrl = testUrl.includes('?') ? `${testUrl}&action=get_all` : `${testUrl}?action=get_all`;
+        const res = await fetch(fullUrl, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+        });
 
-    if (!res.ok) {
-      throw new Error(`تعذر الاتصال بـ Google Apps Script (${res.status})`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const result = await res.json();
+
+        // Support both result.data and direct fields in response
+        const data = result.data || result;
+
+        if (result.status === 'success' || data.products || data.pubgAccounts || data.ucPackages) {
+          this.saveConfig({ 
+            webAppUrl: testUrl,
+            lastSyncedAt: new Date().toLocaleString('ar-LY') 
+          });
+
+          return {
+            products: Array.isArray(data.products) ? data.products : [],
+            pubgAccounts: Array.isArray(data.pubgAccounts) ? data.pubgAccounts : [],
+            allPubgAccounts: Array.isArray(data.allPubgAccounts) ? data.allPubgAccounts : data.pubgAccounts,
+            pubgSubmissions: Array.isArray(data.pubgSubmissions) ? data.pubgSubmissions : [],
+            ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
+            settings: data.settings || {},
+          };
+        }
+      } catch (err: any) {
+        lastError = err;
+      }
     }
 
-    const result = await res.json();
-    if (result.status !== 'success' || !result.data) {
-      throw new Error(result.message || 'فشل جلب البيانات من Google Sheets');
-    }
-
-    this.saveConfig({ lastSyncedAt: new Date().toLocaleString('ar-LY') });
-    return result.data;
+    throw new Error(lastError?.message || 'فشل جلب البيانات من Google Sheets');
   }
 
   /**
