@@ -1,348 +1,373 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { Product, PubgAccount, UcPackage, Category, Order } from '../types';
-import { GoogleSheetsManager } from './GoogleSheetsManager';
+import { Product, PubgAccount, UcPackage, Category } from '../types';
+import { AppsScriptService, AppsScriptConfig, GOOGLE_APPS_SCRIPT_TEMPLATE } from '../services/appsScript';
 import { 
-  Settings, 
   Gamepad2, 
   UserCheck, 
   Zap, 
   ShoppingBag, 
-  Sliders, 
   Plus, 
   Trash2, 
-  Edit3, 
-  Save, 
-  RotateCcw, 
   Check, 
   X, 
   Phone, 
-  Globe, 
-  ShieldAlert,
-  ArrowRight,
-  Eye,
-  FileSpreadsheet,
-  LogOut,
-  Sparkles,
-  Video,
   ExternalLink,
-  Clock
+  RefreshCw,
+  Copy,
+  Link2,
+  AlertCircle,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  MessageCircle,
+  LogOut,
+  Upload,
+  Image as ImageIcon,
+  ShieldCheck
 } from 'lucide-react';
 
-type AdminTab = 'products' | 'pubg_accounts' | 'pubg_submissions' | 'pubg_uc' | 'settings' | 'orders' | 'google_sheets';
+type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'sheets_sync';
 
 export const AdminDashboard: React.FC = () => {
   const {
     products,
     addProduct,
-    updateProduct,
     deleteProduct,
+    updateProduct,
+    allPubgAccounts,
     pubgAccounts,
-    addPubgAccount,
-    updatePubgAccount,
+    togglePubgDisplay,
     deletePubgAccount,
-    pubgSubmissions,
-    approvePubgSubmission,
-    rejectPubgSubmission,
-    deletePubgSubmission,
     ucPackages,
     addUcPackage,
-    updateUcPackage,
     deleteUcPackage,
     settings,
-    updateSettings,
-    orders,
-    updateOrderStatus,
-    deleteOrder,
-    resetToDefaults,
     setCurrentPage,
-    setPreviewVideoUrl,
+    refreshFromAppsScript,
+    isAppsScriptSyncing,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('products');
-  const [toastMsg, setToastMsg] = useState('');
+  const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Editing state for products
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  // Apps Script Sync State
+  const [appsScriptConfig, setAppsScriptConfig] = useState<AppsScriptConfig>(AppsScriptService.getConfig());
+  const [webAppUrl, setWebAppUrl] = useState(appsScriptConfig.webAppUrl || '');
+  const [isCopied, setIsCopied] = useState(false);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+
+  // Products Tab State
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [productForm, setProductForm] = useState<Omit<Product, 'id'>>({
     name: '',
     category: 'سماعات',
     price: 0,
-    oldPrice: 0,
+    oldPrice: undefined,
     image: '',
+    imageBase64: '',
     description: '',
     inStock: true,
   });
 
-  // Editing state for PUBG accounts
-  const [editingAccount, setEditingAccount] = useState<PubgAccount | null>(null);
+  // PUBG Accounts Tab State
   const [isAddingAccount, setIsAddingAccount] = useState(false);
-  const [accountForm, setAccountForm] = useState<Omit<PubgAccount, 'id'>>({
-    title: '',
-    badge: 'كونكيرور',
-    level: 'LVL 75',
-    price: 1000,
-    features: ['50 ميثيك', '10 أسلحة مطورة', 'فول ماكس'],
-    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
-    videoUrl: '',
-    isAvailable: true,
-    powerLevel: '6000',
-    mythicsCount: '50',
-    goldenMythicsCount: '2',
-    upgradableWeaponsCount: '10',
+  const [accountForm, setAccountForm] = useState({
+    ownerName: '',
+    accountName: '',
+    accountLevel: '70',
+    mythicsCount: '30',
+    apartmentLevel: 'مستوى 5',
+    goldCount: '2',
+    upgradableWeapons: 'M4 جوكر لفل 5',
     carsCount: '3',
-    hashtagsCount: '5',
-    linkedAccounts: 'جيميل متاح',
-    sellerName: '',
-    sellerPhone: '',
+    hashtagsCount: '4',
+    linkedServices: 'جيميل متاح',
+    salePrice: '500',
+    sellerPhone: '0912345678',
+    transferPhone: '0912345678',
+    videoUrl: '',
   });
-  const [featuresInput, setFeaturesInput] = useState('');
 
-  // Editing state for UC Packages
-  const [editingUc, setEditingUc] = useState<UcPackage | null>(null);
+  // UC Packages Tab State
   const [isAddingUc, setIsAddingUc] = useState(false);
   const [ucForm, setUcForm] = useState<Omit<UcPackage, 'id'>>({
-    ucAmount: 60,
-    bonusUc: 0,
-    price: 12,
+    ucAmount: 660,
+    bonusUc: 60,
+    price: 35,
     isPopular: false,
   });
 
-  // Store Settings local form state
-  const [settingsForm, setSettingsForm] = useState(settings);
-
-  const showToast = (msg: string) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(''), 3000);
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToastMsg({ type, text });
+    setTimeout(() => setToastMsg(null), 5000);
   };
 
-  // Product Handlers
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleLogout = () => {
+    sessionStorage.removeItem('rtg_admin_authenticated');
+    setCurrentPage('home');
+  };
+
+  // 1. Handle Add Product
+  const handleProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productForm.name || productForm.price <= 0) return;
-
-    if (editingProduct) {
-      updateProduct(editingProduct.id, productForm);
-      showToast('تم تحديث المنتج بنجاح');
-      setEditingProduct(null);
-    } else {
-      addProduct(productForm);
-      showToast('تمت إضافة المنتج بنجاح');
-      setIsAddingProduct(false);
+    if (!productForm.name || !productForm.price) {
+      showToast('error', 'يرجى إدخال اسم المنتج وسعر المنتج');
+      return;
     }
-  };
 
-  const startEditProduct = (prod: Product) => {
-    setEditingProduct(prod);
+    const finalImage = productForm.imageBase64 || productForm.image || 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80';
+
+    addProduct({
+      ...productForm,
+      image: finalImage,
+      price: Number(productForm.price),
+      oldPrice: productForm.oldPrice ? Number(productForm.oldPrice) : undefined,
+    });
+
     setProductForm({
-      name: prod.name,
-      category: prod.category,
-      price: prod.price,
-      oldPrice: prod.oldPrice || 0,
-      image: prod.image,
-      description: prod.description,
-      inStock: prod.inStock,
+      name: '',
+      category: 'سماعات',
+      price: 0,
+      oldPrice: undefined,
+      image: '',
+      imageBase64: '',
+      description: '',
+      inStock: true,
     });
     setIsAddingProduct(false);
+    showToast('success', 'تمت إضافة المنتج وحفظه في Google Sheet بنجاح!');
   };
 
-  // PUBG Account Handlers
-  const handleSaveAccount = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!accountForm.title || accountForm.price <= 0) return;
-
-    const feats = featuresInput
-      ? featuresInput.split(',').map((s) => s.trim()).filter(Boolean)
-      : accountForm.features;
-
-    const finalData = { ...accountForm, features: feats };
-
-    if (editingAccount) {
-      updatePubgAccount(editingAccount.id, finalData);
-      showToast('تم تحديث حساب PUBG بنجاح');
-      setEditingAccount(null);
-    } else {
-      addPubgAccount(finalData);
-      showToast('تمت إضافة حساب PUBG بنجاح');
-      setIsAddingAccount(false);
+  // Image Upload Handler for Products
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProductForm((prev) => ({
+          ...prev,
+          imageBase64: reader.result as string,
+        }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const startEditAccount = (acc: PubgAccount) => {
-    setEditingAccount(acc);
-    setAccountForm({
-      title: acc.title,
-      badge: acc.badge,
-      level: acc.level,
-      price: acc.price,
-      features: acc.features,
-      image: acc.image,
-      videoUrl: acc.videoUrl || '',
-      isAvailable: acc.isAvailable,
-      powerLevel: acc.powerLevel || '',
-      mythicsCount: acc.mythicsCount || '',
-      goldenMythicsCount: acc.goldenMythicsCount || '',
-      upgradableWeaponsCount: acc.upgradableWeaponsCount || '',
-      carsCount: acc.carsCount || '',
-      hashtagsCount: acc.hashtagsCount || '',
-      linkedAccounts: acc.linkedAccounts || '',
-      sellerName: acc.sellerName || '',
-      sellerPhone: acc.sellerPhone || '',
-    });
-    setFeaturesInput(acc.features.join(', '));
+  // 2. Handle PUBG Account Actions
+  const handleToggleAccountDisplay = async (accId: string, currentStatus: 'نعم' | 'لا' | undefined) => {
+    const newStatus: 'نعم' | 'لا' = currentStatus === 'نعم' ? 'لا' : 'نعم';
+    try {
+      await togglePubgDisplay(accId, newStatus);
+      showToast(
+        'success',
+        newStatus === 'نعم' 
+          ? 'تم تغيير الحالة إلى (نعم) وعرض الحساب بالموقع فوراً!' 
+          : 'تم إخفاء الحساب من الموقع بنجاح.'
+      );
+    } catch (err: any) {
+      showToast('error', 'حدث خطأ أثناء تحديث حالة الحساب');
+    }
+  };
+
+  const handleManualAddAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accountForm.accountName || !accountForm.sellerPhone) {
+      showToast('error', 'يرجى إدخال اسم الحساب ورقم هاتف البائع');
+      return;
+    }
+
+    const newAcc: PubgAccount = {
+      id: `acc-${Date.now()}`,
+      title: accountForm.accountName,
+      accountName: accountForm.accountName,
+      ownerName: accountForm.ownerName,
+      level: `LVL ${accountForm.accountLevel}`,
+      accountLevel: accountForm.accountLevel,
+      badge: 'حساب موثق',
+      price: Number(accountForm.salePrice) || 0,
+      salePrice: accountForm.salePrice,
+      sellerPhone: accountForm.sellerPhone,
+      transferPhone: accountForm.transferPhone,
+      mythicsCount: accountForm.mythicsCount,
+      apartmentLevel: accountForm.apartmentLevel,
+      goldCount: accountForm.goldCount,
+      upgradableWeaponsCount: accountForm.upgradableWeapons,
+      carsCount: accountForm.carsCount,
+      hashtagsCount: accountForm.hashtagsCount,
+      linkedServices: accountForm.linkedServices,
+      linkedAccounts: accountForm.linkedServices,
+      videoUrl: accountForm.videoUrl,
+      image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
+      isAvailable: true,
+      displayOnSite: 'نعم',
+      approved: true,
+      status: 'approved',
+      features: [
+        accountForm.mythicsCount ? `${accountForm.mythicsCount} ميثيك` : '',
+        accountForm.upgradableWeapons || '',
+        accountForm.carsCount ? `${accountForm.carsCount} سيارات` : '',
+      ].filter(Boolean),
+    };
+
+    // Save to apps script
+    const config = AppsScriptService.getConfig();
+    if (config.webAppUrl) {
+      await AppsScriptService.submitPubgSellAccount(config.webAppUrl, {
+        ...accountForm,
+        id: newAcc.id,
+        displayOnSite: 'نعم',
+      });
+    }
+
+    await togglePubgDisplay(newAcc.id, 'نعم');
     setIsAddingAccount(false);
+    showToast('success', 'تمت إضافة الحساب واعتماده للعرض في الموقع بنجاح!');
   };
 
-  // UC Package Handlers
-  const handleSaveUc = (e: React.FormEvent) => {
+  // 3. Handle Add UC Package
+  const handleUcSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingUc) {
-      updateUcPackage(editingUc.id, ucForm);
-      showToast('تم تحديث باقة الشدات');
-      setEditingUc(null);
-    } else {
-      addUcPackage(ucForm);
-      showToast('تمت إضافة باقة الشدات');
-      setIsAddingUc(false);
+    if (!ucForm.ucAmount || !ucForm.price) {
+      showToast('error', 'يرجى إدخال كمية الشدات والسعر');
+      return;
     }
-  };
 
-  const startEditUc = (pkg: UcPackage) => {
-    setEditingUc(pkg);
+    addUcPackage({
+      ucAmount: Number(ucForm.ucAmount),
+      bonusUc: Number(ucForm.bonusUc) || 0,
+      price: Number(ucForm.price),
+      isPopular: ucForm.isPopular,
+    });
+
     setUcForm({
-      ucAmount: pkg.ucAmount,
-      bonusUc: pkg.bonusUc,
-      price: pkg.price,
-      isPopular: !!pkg.isPopular,
+      ucAmount: 660,
+      bonusUc: 60,
+      price: 35,
+      isPopular: false,
     });
     setIsAddingUc(false);
+    showToast('success', 'تمت إضافة باقة الشدات إلى Google Sheet بنجاح!');
   };
 
-  // Settings Handler
-  const handleSaveSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateSettings(settingsForm);
-    showToast('تم حفظ إعدادات المتجر بنجاح');
+  // 4. Handle Apps Script Save & Sync
+  const handleSaveAndSync = async () => {
+    if (!webAppUrl.trim()) {
+      showToast('error', 'يرجى إدخال رابط تطبيق الويب Google Apps Script أولاً');
+      return;
+    }
+
+    try {
+      setIsManualSyncing(true);
+      const updated = AppsScriptService.saveConfig({
+        webAppUrl: webAppUrl.trim(),
+      });
+      setAppsScriptConfig(updated);
+
+      await refreshFromAppsScript();
+      showToast('success', 'تم جلب وتحديث كافة المنتجات والحسابات وباقات الشدات من Google Sheet بنجاح!');
+    } catch (err: any) {
+      showToast('error', err.message || 'تعذر الاتصال بـ Google Sheets، تأكد من صحة الرابط ونشر السكريبت بحق وصول Anyone');
+    } finally {
+      setIsManualSyncing(false);
+    }
   };
 
-  const categoriesList: Category[] = [
-    'سماعات',
-    'مبردات',
-    'كروت شاشة',
-    'ميكروفونات',
-    'كيبورد',
-    'ماوس',
-  ];
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_TEMPLATE);
+    setIsCopied(true);
+    showToast('success', 'تم نسخ كود Apps Script الكامل إلى الحافظة بنجاح!');
+    setTimeout(() => setIsCopied(false), 3000);
+  };
+
+  // Determine list of accounts to display
+  // Merge allPubgAccounts and pubgAccounts to ensure no account is missed
+  const displayedPubgAccounts = allPubgAccounts.length > 0 ? allPubgAccounts : pubgAccounts;
 
   return (
-    <div className="py-8 sm:py-12 min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-right">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-8 mb-8 border-b border-white/10">
-          <div>
-            <div className="flex items-center justify-end sm:justify-start gap-2.5 mb-2">
-              <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold rounded-lg">
-                ADMIN PANEL
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-black text-white">
-                لوحة تحكم المتجر
-              </h1>
+    <div className="min-h-screen bg-[#0a0b10] py-8 px-4 sm:px-6 lg:px-8 text-right font-['Cairo',sans-serif]">
+      <div className="max-w-6xl mx-auto">
+        
+        {/* Top Header */}
+        <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400">
+              <ShieldCheck className="w-6 h-6" />
             </div>
-            <p className="text-xs sm:text-sm text-slate-400">
-              تحكم بجميع محتويات الموقع: المنتجات، حسابات ببجي، باقات الشحن، ورقم الواتساب
-            </p>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-white">
+                لوحة تحكم الأدمن <span className="text-red-500 text-sm font-mono font-bold">RTG GEAR X</span>
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                إدارة سهلة ومباشرة مرتبطة مع Google Sheets بدون أي تعقيد
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                sessionStorage.removeItem('rtg_admin_authenticated');
-                setCurrentPage('home');
-              }}
-              className="px-3.5 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs flex items-center gap-1.5 border border-red-500/20 transition-colors"
-              title="تسجيل خروج من لوحة التحكم"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>تسجيل خروج</span>
-            </button>
-
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage('home')}
-              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center gap-2 border border-white/10 transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition-all flex items-center gap-2 border border-white/10"
             >
-              <span>معاينة الموقع</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>معاينة المتجر</span>
+              <ExternalLink className="w-4 h-4" />
             </button>
-
             <button
-              onClick={() => {
-                resetToDefaults();
-                showToast('تمت إعادة ضبط البيانات الافتراضية بنجاح');
-              }}
-              className="p-2.5 rounded-xl bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 transition-colors"
-              title="إعادة ضبط البيانات الأصلية"
+              onClick={handleLogout}
+              className="px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition-all flex items-center gap-2 border border-red-500/20"
             >
-              <RotateCcw className="w-4 h-4" />
+              <span>تسجيل خروج</span>
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
 
         {/* Toast Alert */}
         {toastMsg && (
-          <div className="mb-6 p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-sm font-bold flex items-center gap-2 animate-fadeIn">
-            <Check className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-            <span>{toastMsg}</span>
+          <div
+            className={`mb-6 p-4 rounded-2xl border flex items-center gap-3 text-xs sm:text-sm font-bold animate-fadeIn ${
+              toastMsg.type === 'success'
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                : 'bg-red-500/15 border-red-500/30 text-red-300'
+            }`}
+          >
+            {toastMsg.type === 'success' ? <CheckCircle2 className="w-5 h-5 flex-shrink-0" /> : <AlertCircle className="w-5 h-5 flex-shrink-0" />}
+            <span>{toastMsg.text}</span>
           </div>
         )}
 
-        {/* Tabs Bar */}
-        <div className="flex items-center justify-start gap-2 overflow-x-auto pb-4 mb-8">
+        {/* 4 Main Tabs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-8">
           <button
             onClick={() => setActiveTab('products')}
-            className={`px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+            className={`p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all border ${
               activeTab === 'products'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-950/80'
-                : 'bg-[#151824] text-slate-400 hover:text-white border border-white/5'
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
+                : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Gamepad2 className="w-4 h-4" />
-            <span>المنتجات والمعدات ({products.length})</span>
+            <ShoppingBag className="w-4 h-4" />
+            <span>المنتجات ({products.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('pubg_accounts')}
-            className={`px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+            className={`p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all border ${
               activeTab === 'pubg_accounts'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-950/80'
-                : 'bg-[#151824] text-slate-400 hover:text-white border border-white/5'
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
+                : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <UserCheck className="w-4 h-4" />
-            <span>حسابات PUBG المعروضة ({pubgAccounts.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('pubg_submissions')}
-            className={`px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap relative ${
-              activeTab === 'pubg_submissions'
-                ? 'bg-gradient-to-r from-amber-600 to-red-600 text-white shadow-lg shadow-amber-950/80'
-                : 'bg-[#151824] text-slate-400 hover:text-white border border-white/5'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span>طلبات بيع الحسابات الواردة ({pubgSubmissions.length})</span>
-            {pubgSubmissions.filter((s) => s.status === 'pending').length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping absolute top-2 left-2" />
-            )}
+            <Gamepad2 className="w-4 h-4" />
+            <span>حسابات ببجي ({displayedPubgAccounts.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('pubg_uc')}
-            className={`px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
+            className={`p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all border ${
               activeTab === 'pubg_uc'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-950/80'
-                : 'bg-[#151824] text-slate-400 hover:text-white border border-white/5'
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
+                : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
             <Zap className="w-4 h-4" />
@@ -350,833 +375,554 @@ export const AdminDashboard: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveTab('orders')}
-            className={`px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'orders'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-950/80'
-                : 'bg-[#151824] text-slate-400 hover:text-white border border-white/5'
+            onClick={() => setActiveTab('sheets_sync')}
+            className={`p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all border ${
+              activeTab === 'sheets_sync'
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
+                : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <ShoppingBag className="w-4 h-4" />
-            <span>سجل الطلبات ({orders.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('google_sheets')}
-            className={`px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'google_sheets'
-                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-950/80'
-                : 'bg-[#151824] text-slate-400 hover:text-white border border-white/5'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>جداول بيانات Google Sheets</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
-              activeTab === 'settings'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-950/80'
-                : 'bg-[#151824] text-slate-400 hover:text-white border border-white/5'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            <span>إعدادات المتجر</span>
+            <Link2 className="w-4 h-4" />
+            <span>الربط وجلب البيانات</span>
           </button>
         </div>
 
-        {/* TAB 1: PRODUCTS MANAGEMENT */}
+        {/* TAB 1: PRODUCTS */}
         {activeTab === 'products' && (
-          <div className="space-y-8">
+          <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">إدارة المنتجات والمعدات</h2>
-              {!isAddingProduct && !editingProduct && (
-                <button
-                  onClick={() => {
-                    setIsAddingProduct(true);
-                    setEditingProduct(null);
-                    setProductForm({
-                      name: '',
-                      category: 'سماعات',
-                      price: 150,
-                      oldPrice: 0,
-                      image: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80',
-                      description: '',
-                      inStock: true,
-                    });
-                  }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-950/60"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>إضافة منتج جديد</span>
-                </button>
-              )}
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5 text-red-500" />
+                <span>إدارة المنتجات في المتجر وجوجل شيت</span>
+              </h2>
+              <button
+                onClick={() => setIsAddingProduct(!isAddingProduct)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{isAddingProduct ? 'إلغاء' : 'إضافة منتج جديد'}</span>
+              </button>
             </div>
 
-            {/* Product Add/Edit Form */}
-            {(isAddingProduct || editingProduct) && (
-              <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 sm:p-8 space-y-5 animate-fadeIn">
-                <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                  <button
-                    onClick={() => {
-                      setIsAddingProduct(false);
-                      setEditingProduct(null);
-                    }}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                  <h3 className="text-lg font-bold text-white">
-                    {editingProduct ? 'تعديل المنتج' : 'إضافة منتج جديد'}
-                  </h3>
-                </div>
+            {/* Add Product Form */}
+            {isAddingProduct && (
+              <form onSubmit={handleProductSubmit} className="bg-[#151824] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4 animate-fadeIn">
+                <h3 className="text-sm font-bold text-white pb-3 border-b border-white/10">
+                  إضافة منتج جديد إلى Google Sheet
+                </h3>
 
-                <form onSubmit={handleSaveProduct} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">اسم المنتج</label>
-                      <input
-                        type="text"
-                        required
-                        value={productForm.name}
-                        onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">الفئة</label>
-                      <select
-                        value={productForm.category}
-                        onChange={(e) => setProductForm({ ...productForm, category: e.target.value as Category })}
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none cursor-pointer"
-                      >
-                        {categoriesList.map((cat) => (
-                          <option key={cat} value={cat} className="bg-[#11131c]">
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">السعر (د.ل)</label>
-                      <input
-                        type="number"
-                        required
-                        value={productForm.price}
-                        onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })}
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm font-mono outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">السعر قبل الخصم (اختياري)</label>
-                      <input
-                        type="number"
-                        value={productForm.oldPrice || ''}
-                        onChange={(e) => setProductForm({ ...productForm, oldPrice: Number(e.target.value) || undefined })}
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm font-mono outline-none"
-                      />
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">اسم المنتج *</label>
+                    <input
+                      type="text"
+                      required
+                      value={productForm.name}
+                      onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                      placeholder="مثال: سماعة HyperX Cloud II"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">رابط صورة المنتج (Image URL)</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">فئة المنتج</label>
+                    <select
+                      value={productForm.category}
+                      onChange={(e) => setProductForm({ ...productForm, category: e.target.value as Category })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    >
+                      <option value="سماعات">سماعات</option>
+                      <option value="كيبورد">كيبوردات</option>
+                      <option value="ماوس">ماوسات</option>
+                      <option value="ميكروفونات">ميكروفونات</option>
+                      <option value="مبردات">مبردات</option>
+                      <option value="كروت شاشة">كروت شاشة</option>
+                      <option value="الكل">أخرى / عام</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">السعر (دينار ليبي) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={productForm.price || ''}
+                      onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })}
+                      placeholder="مثال: 180"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">السعر قبل الخصم (اختياري)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={productForm.oldPrice || ''}
+                      onChange={(e) => setProductForm({ ...productForm, oldPrice: e.target.value ? Number(e.target.value) : undefined })}
+                      placeholder="مثال: 220"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">رابط صورة المنتج (URL)</label>
                     <input
                       type="url"
-                      required
                       value={productForm.image}
                       onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
-                      placeholder="https://..."
-                      className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none font-mono text-left"
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none mb-2"
                     />
+                    
+                    <div className="flex items-center gap-3">
+                      <label className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 cursor-pointer flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-red-400" />
+                        <span>أو ارفع صورة من جهازك</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                      {productForm.imageBase64 && (
+                        <span className="text-[11px] text-emerald-400 font-bold">✓ تم اختيار صورة من الجهاز</span>
+                      )}
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">الوصف والمواصفات</label>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">الوصف والمواصفات</label>
                     <textarea
                       rows={3}
-                      required
                       value={productForm.description}
                       onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                      className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none resize-none"
+                      placeholder="اكتب مواصفات المنتج ومميزاته..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none resize-none"
                     />
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <label className="text-xs font-bold text-slate-300 flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={productForm.inStock}
-                        onChange={(e) => setProductForm({ ...productForm, inStock: e.target.checked })}
-                        className="w-4 h-4 accent-red-600 rounded"
-                      />
-                      <span>متوفر في المخزون (In Stock)</span>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center gap-3 pt-3">
-                    <button
-                      type="submit"
-                      className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-950/60"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>{editingProduct ? 'حفظ التعديلات' : 'إضافة المنتج'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddingProduct(false);
-                        setEditingProduct(null);
-                      }}
-                      className="px-5 py-3 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl text-xs font-bold"
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* Products Table */}
-            {products.length === 0 ? (
-              <div className="text-center py-16 bg-[#12141e] border border-white/10 rounded-3xl p-8">
-                <Gamepad2 className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-                <h3 className="text-base font-bold text-white mb-1">لا توجد أي منتجات مضافة</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  المتجر فارغ وجاهز. يمكنك البدء بإضافة أول منتج للبيع عبر زر "إضافة منتج جديد" أعلاه وسيُحفظ تلقائياً في Google Sheets.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-[#12141e] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-right text-xs">
-                    <thead className="bg-[#171926] text-slate-400 font-bold border-b border-white/10">
-                      <tr>
-                        <th className="py-4 px-4">الصورة</th>
-                        <th className="py-4 px-4">اسم المنتج</th>
-                        <th className="py-4 px-4">الفئة</th>
-                        <th className="py-4 px-4">السعر</th>
-                        <th className="py-4 px-4">الحالة</th>
-                        <th className="py-4 px-4 text-left">الإجراءات</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {products.map((prod) => (
-                        <tr key={prod.id} className="hover:bg-white/5 transition-colors">
-                          <td className="py-3 px-4">
-                            <img
-                              src={prod.image}
-                              alt={prod.name}
-                              className="w-12 h-12 rounded-xl object-cover border border-white/10 bg-black/40"
-                            />
-                          </td>
-                          <td className="py-3 px-4 font-bold text-white">{prod.name}</td>
-                          <td className="py-3 px-4">
-                            <span className="px-2.5 py-1 bg-red-600/15 text-red-400 rounded-lg font-semibold">
-                              {prod.category}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 font-mono font-bold text-white">
-                            {prod.price} د.ل
-                          </td>
-                          <td className="py-3 px-4">
-                            {prod.inStock ? (
-                              <span className="text-emerald-400 font-bold">متوفر</span>
-                            ) : (
-                              <span className="text-red-400 font-bold">نفذ</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-left">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => startEditProduct(prod)}
-                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
-                                title="تعديل"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  deleteProduct(prod.id);
-                                  showToast(`تم حذف ${prod.name} بنجاح`);
-                                }}
-                                className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
-                                title="حذف"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* TAB 2: PUBG ACCOUNTS MANAGEMENT */}
-        {activeTab === 'pubg_accounts' && (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">إدارة حسابات PUBG Mobile</h2>
-              {!isAddingAccount && !editingAccount && (
-                <button
-                  onClick={() => {
-                    setIsAddingAccount(true);
-                    setEditingAccount(null);
-                    setAccountForm({
-                      title: '',
-                      badge: 'كونكيرور',
-                      level: 'LVL 75',
-                      price: 1200,
-                      features: ['50 ميثيك', '15 سلاح مطور', 'فول ماكس', 'سكين سيارة'],
-                      image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
-                      videoUrl: '',
-                      isAvailable: true,
-                    });
-                    setFeaturesInput('50 ميثيك, 15 سلاح مطور, فول ماكس, سكين سيارة');
-                  }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-950/60"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>إضافة حساب جديد</span>
-                </button>
-              )}
-            </div>
-
-            {/* Account Form */}
-            {(isAddingAccount || editingAccount) && (
-              <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 sm:p-8 space-y-5 animate-fadeIn">
-                <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
                   <button
-                    onClick={() => {
-                      setIsAddingAccount(false);
-                      setEditingAccount(null);
-                    }}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400"
+                    type="button"
+                    onClick={() => setIsAddingProduct(false)}
+                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold"
                   >
-                    <X className="w-5 h-5" />
+                    إلغاء
                   </button>
-                  <h3 className="text-lg font-bold text-white">
-                    {editingAccount ? 'تعديل حساب PUBG' : 'إضافة حساب جديد'}
-                  </h3>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg transition-all"
+                  >
+                    حفظ وإضافة للمتجر
+                  </button>
                 </div>
-
-                <form onSubmit={handleSaveAccount} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">عنوان الحساب</label>
-                    <input
-                      type="text"
-                      required
-                      value={accountForm.title}
-                      onChange={(e) => setAccountForm({ ...accountForm, title: e.target.value })}
-                      placeholder="مثال: حساب ميثيك فاشون - كونكيرور سيزون 19"
-                      className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">البادج (Badge)</label>
-                      <input
-                        type="text"
-                        required
-                        value={accountForm.badge}
-                        onChange={(e) => setAccountForm({ ...accountForm, badge: e.target.value })}
-                        placeholder="كونكيرور / آيس ماستر"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">المستوى (Level)</label>
-                      <input
-                        type="text"
-                        required
-                        value={accountForm.level}
-                        onChange={(e) => setAccountForm({ ...accountForm, level: e.target.value })}
-                        placeholder="LVL 78"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm font-mono outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">السعر (د.ل)</label>
-                      <input
-                        type="number"
-                        required
-                        value={accountForm.price}
-                        onChange={(e) => setAccountForm({ ...accountForm, price: Number(e.target.value) })}
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm font-mono outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">مستوى القوة</label>
-                      <input
-                        type="text"
-                        value={accountForm.powerLevel || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, powerLevel: e.target.value })}
-                        placeholder="مثال: 6500"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">عدد الميثيك العادي</label>
-                      <input
-                        type="text"
-                        value={accountForm.mythicsCount || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, mythicsCount: e.target.value })}
-                        placeholder="مثال: 55 ميثيك"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">عدد الميثيك الذهبي</label>
-                      <input
-                        type="text"
-                        value={accountForm.goldenMythicsCount || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, goldenMythicsCount: e.target.value })}
-                        placeholder="مثال: 3 بدلات"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">الأسلحة المطورة والماكس</label>
-                      <input
-                        type="text"
-                        value={accountForm.upgradableWeaponsCount || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, upgradableWeaponsCount: e.target.value })}
-                        placeholder="مثال: 12 سلاح مطور"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">عدد السيارات</label>
-                      <input
-                        type="text"
-                        value={accountForm.carsCount || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, carsCount: e.target.value })}
-                        placeholder="مثال: 4 سيارات"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">الهاشتاجات والألقاب</label>
-                      <input
-                        type="text"
-                        value={accountForm.hashtagsCount || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, hashtagsCount: e.target.value })}
-                        placeholder="مثال: 8 هاشتاجات"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">روابط الربط (جيميل، فيسبوك...)</label>
-                      <input
-                        type="text"
-                        value={accountForm.linkedAccounts || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, linkedAccounts: e.target.value })}
-                        placeholder="مثال: جيميل + فيسبوك"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">اسم البائع (داخلي)</label>
-                      <input
-                        type="text"
-                        value={accountForm.sellerName || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, sellerName: e.target.value })}
-                        placeholder="محمد علي"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">رقم هاتف البائع (داخلي)</label>
-                      <input
-                        type="text"
-                        dir="ltr"
-                        value={accountForm.sellerPhone || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, sellerPhone: e.target.value })}
-                        placeholder="091xxxxxxx"
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm font-mono text-right outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">
-                      المميزات السريعة للبطاقة (افصل بين كل ميزة بفاصلة ,)
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={featuresInput}
-                      onChange={(e) => setFeaturesInput(e.target.value)}
-                      placeholder="75 ميثيك, 20 سلاح مطور, بدلة المومياء, ام فور الجوكر ماكس, فول ماكس..."
-                      className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">رابط الصورة (Image URL)</label>
-                      <input
-                        type="url"
-                        required
-                        value={accountForm.image}
-                        onChange={(e) => setAccountForm({ ...accountForm, image: e.target.value })}
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm font-mono text-left outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">رابط الفيديو (اختياري)</label>
-                      <input
-                        type="url"
-                        value={accountForm.videoUrl || ''}
-                        onChange={(e) => setAccountForm({ ...accountForm, videoUrl: e.target.value })}
-                        placeholder="https://..."
-                        className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 rounded-xl py-2.5 px-4 text-white text-sm font-mono text-left outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 pt-3">
-                    <button
-                      type="submit"
-                      className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-950/60"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>{editingAccount ? 'حفظ التعديلات' : 'إضافة الحساب'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddingAccount(false);
-                        setEditingAccount(null);
-                      }}
-                      className="px-5 py-3 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl text-xs font-bold"
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </form>
-              </div>
+              </form>
             )}
 
-            {/* Accounts List */}
-            {pubgAccounts.length === 0 ? (
-              <div className="text-center py-16 bg-[#12141e] border border-white/10 rounded-3xl p-8">
-                <Sparkles className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-                <h3 className="text-base font-bold text-white mb-1">لا توجد أي حسابات معروضة حالياً</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  يمكنك إضافة حساب يدوياً أو اعتماد طلبات بيع الحسابات الواردة من تبويب "طلبات بيع الحسابات".
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pubgAccounts.map((acc) => (
-                  <div
-                    key={acc.id}
-                    className="p-5 rounded-3xl bg-[#12141e] border border-white/10 flex items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <img
-                        src={acc.image}
-                        alt={acc.title}
-                        className="w-16 h-16 rounded-2xl object-cover border border-white/10 flex-shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="px-2 py-0.5 rounded-md bg-red-600/20 text-red-400 text-[10px] font-bold">
-                            {acc.badge}
-                          </span>
-                          <span className="text-xs text-slate-400 font-mono">{acc.level}</span>
-                        </div>
-                        <h4 className="text-sm font-bold text-white truncate">{acc.title}</h4>
-                        <p className="text-xs text-red-400 font-mono font-bold mt-1">
-                          {acc.price.toLocaleString()} د.ل
-                        </p>
+            {/* Products List */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {products.map((prod) => (
+                <div key={prod.id} className="bg-[#12141e] border border-white/10 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-md group hover:border-red-500/30 transition-all">
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={prod.image || 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?auto=format&fit=crop&w=800&q=80'}
+                      alt={prod.name}
+                      className="w-16 h-16 rounded-xl object-cover border border-white/10 flex-shrink-0 bg-black/40"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-red-400 font-bold">
+                        {prod.category}
+                      </span>
+                      <h4 className="text-xs font-bold text-white truncate mt-1">{prod.name}</h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm font-black text-red-500 font-mono">{prod.price} د.ل</span>
+                        {prod.oldPrice && (
+                          <span className="text-[10px] text-slate-500 line-through font-mono">{prod.oldPrice} د.ل</span>
+                        )}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => startEditAccount(acc)}
-                        className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
-                        title="تعديل"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          deletePubgAccount(acc.id);
-                          showToast(`تم حذف الحساب ${acc.title} بنجاح`);
-                        }}
-                        className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
-                        title="حذف"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+
+                  <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs">
+                    <button
+                      onClick={() => updateProduct(prod.id, { inStock: !prod.inStock })}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                        prod.inStock ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/15 text-red-300 border border-red-500/30'
+                      }`}
+                    >
+                      {prod.inStock ? 'متوفر بالمخزون' : 'غير متوفر'}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (confirm(`هل أنت متأكد من حذف المنتج "${prod.name}"؟`)) {
+                          deleteProduct(prod.id);
+                          showToast('success', 'تم حذف المنتج بنجاح');
+                        }
+                      }}
+                      className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                      title="حذف المنتج"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* TAB: PUBG SUBMISSIONS (طلبات بيع الحسابات الواردة من المستخدمين) */}
-        {activeTab === 'pubg_submissions' && (
-          <div className="space-y-8">
-            {/* Header & Stats Banner */}
-            <div className="bg-gradient-to-r from-amber-950/40 via-[#12141e] to-red-950/30 border border-amber-500/30 rounded-3xl p-6 relative overflow-hidden">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold rounded-lg flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      PUBG SELL REQUESTS
-                    </span>
-                    <span className="text-xs text-slate-400">تحقق وموافقة فورية</span>
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-white">
-                    طلبات بيع حسابات PUBG الواردة ({pubgSubmissions.length})
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                    هنا تظهر جميع طلبات إضافة حسابات PUBG المقدمة من الزوار. تأكد من تحويل 5 ليرات إلى الرقم <strong className="text-amber-300 font-mono">0943981577</strong>، وافحص تفاصيل الحساب وفيديو الاستعراض، ثم اضغط على زر "موافقة ونشر في المتجر" ليظهر الحساب مباشرة للمشترين.
-                  </p>
-                </div>
+        {/* TAB 2: PUBG ACCOUNTS */}
+        {activeTab === 'pubg_accounts' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[#12141e] border border-white/10 rounded-2xl p-4">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <Gamepad2 className="w-5 h-5 text-red-500" />
+                  <span>طلبات وحسابات PUBG Mobile</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  تأكد من تحويل رسوم العرض (5 دينار) بالاتصال بالبائع ثم اضغط على زر العرض لتغييره إلى <strong className="text-emerald-400 font-bold">(نعم)</strong> ليظهر بالموقع.
+                </p>
+              </div>
 
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setActiveTab('google_sheets')}
-                    className="px-4 py-2.5 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-2 transition-colors"
-                  >
-                    <FileSpreadsheet className="w-4 h-4" />
-                    <span>عرض وحفظ في Google Sheets</span>
-                  </button>
-                </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <a
+                  href={settings.googleFormUrl || 'https://forms.gle/LCS6CgXUWciHH21k8'}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-bold flex items-center gap-1.5"
+                >
+                  <span>نموذج Google Form</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                <button
+                  onClick={() => setIsAddingAccount(!isAddingAccount)}
+                  className="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isAddingAccount ? 'إلغاء' : 'إضافة حساب يدوياً'}</span>
+                </button>
               </div>
             </div>
 
-            {/* Submissions List */}
-            {pubgSubmissions.length === 0 ? (
-              <div className="text-center py-16 bg-[#12141e] border border-white/10 rounded-3xl space-y-3">
-                <Sparkles className="w-12 h-12 text-amber-500/40 mx-auto" />
-                <h3 className="text-base font-bold text-white">لا توجد طلبات بيع حسابات حالياً</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  عندما يقوم أي عميل بإرسال طلب بيع حساب ببجي الخاص به من واجهة المتجر، سيظهر هنا مع كافة التفاصيل للتأكيد والنشر.
+            {/* Add Account Manually Form */}
+            {isAddingAccount && (
+              <form onSubmit={handleManualAddAccount} className="bg-[#151824] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4 animate-fadeIn">
+                <h3 className="text-sm font-bold text-white pb-3 border-b border-white/10">
+                  إضافة حساب ببجي يدوياً وعرضه في الموقع
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">اسم المالك</label>
+                    <input
+                      type="text"
+                      value={accountForm.ownerName}
+                      onChange={(e) => setAccountForm({ ...accountForm, ownerName: e.target.value })}
+                      placeholder="اسم صاحب الحساب"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">اسم الحساب في اللعبة *</label>
+                    <input
+                      type="text"
+                      required
+                      value={accountForm.accountName}
+                      onChange={(e) => setAccountForm({ ...accountForm, accountName: e.target.value })}
+                      placeholder="مثال: 〆KING〆"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">مستوى الحساب (Level)</label>
+                    <input
+                      type="text"
+                      value={accountForm.accountLevel}
+                      onChange={(e) => setAccountForm({ ...accountForm, accountLevel: e.target.value })}
+                      placeholder="75"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">عدد الميثكات</label>
+                    <input
+                      type="text"
+                      value={accountForm.mythicsCount}
+                      onChange={(e) => setAccountForm({ ...accountForm, mythicsCount: e.target.value })}
+                      placeholder="35"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">الأسلحة المطورة</label>
+                    <input
+                      type="text"
+                      value={accountForm.upgradableWeapons}
+                      onChange={(e) => setAccountForm({ ...accountForm, upgradableWeapons: e.target.value })}
+                      placeholder="M4 جوكر لفل 5، AWM ماكس"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">عدد سكنات السيارات</label>
+                    <input
+                      type="text"
+                      value={accountForm.carsCount}
+                      onChange={(e) => setAccountForm({ ...accountForm, carsCount: e.target.value })}
+                      placeholder="3"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">خدمات الربط</label>
+                    <input
+                      type="text"
+                      value={accountForm.linkedServices}
+                      onChange={(e) => setAccountForm({ ...accountForm, linkedServices: e.target.value })}
+                      placeholder="جيميل + رقم متاح"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">سعر البيع المطلوب (د.ل) *</label>
+                    <input
+                      type="text"
+                      required
+                      value={accountForm.salePrice}
+                      onChange={(e) => setAccountForm({ ...accountForm, salePrice: e.target.value })}
+                      placeholder="850"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">رقم هاتف البائع *</label>
+                    <input
+                      type="text"
+                      required
+                      value={accountForm.sellerPhone}
+                      onChange={(e) => setAccountForm({ ...accountForm, sellerPhone: e.target.value })}
+                      placeholder="0912345678"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">الرقم المحول منه 5 دينار</label>
+                    <input
+                      type="text"
+                      value={accountForm.transferPhone}
+                      onChange={(e) => setAccountForm({ ...accountForm, transferPhone: e.target.value })}
+                      placeholder="0923456789"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">رابط فيديو الحساب (اختياري)</label>
+                    <input
+                      type="url"
+                      value={accountForm.videoUrl}
+                      onChange={(e) => setAccountForm({ ...accountForm, videoUrl: e.target.value })}
+                      placeholder="https://..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingAccount(false)}
+                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg"
+                  >
+                    حفظ وعرض الحساب بالموقع
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Accounts Cards List */}
+            {displayedPubgAccounts.length === 0 ? (
+              <div className="text-center py-12 bg-[#12141e] rounded-3xl border border-white/5 p-6">
+                <Gamepad2 className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+                <h3 className="text-sm font-bold text-white mb-1">لا توجد حسابات مسجلة حالياً</h3>
+                <p className="text-xs text-slate-400 mb-4">
+                  عندما يملأ الزبائن نموذج Google Form أو تضيف حساباً يدوياً، ستظهر الطلبات هنا مباشرة.
                 </p>
+                <button
+                  onClick={handleSaveAndSync}
+                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold"
+                >
+                  تحديث البيانات من Google Sheet
+                </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-5">
-                {pubgSubmissions.map((sub) => (
-                  <div
-                    key={sub.id}
-                    className={`p-6 rounded-3xl border transition-all ${
-                      sub.status === 'approved'
-                        ? 'bg-[#12181e] border-emerald-500/30'
-                        : sub.status === 'rejected'
-                        ? 'bg-[#1e1214] border-red-500/20 opacity-75'
-                        : 'bg-[#12141e] border-amber-500/30 shadow-lg shadow-amber-950/20'
-                    }`}
-                  >
-                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 pb-5 border-b border-white/10">
-                      {/* Left: Main Header Info */}
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                          <span
-                            className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
-                              sub.status === 'approved'
-                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                : sub.status === 'rejected'
-                                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse'
+              <div className="space-y-4">
+                {displayedPubgAccounts.map((acc) => {
+                  const isApproved = acc.displayOnSite === 'نعم' || acc.approved === true;
+                  const sellerNumber = acc.sellerPhone || '';
+                  const cleanSellerPhone = sellerNumber.replace(/[^0-9]/g, '');
+
+                  return (
+                    <div
+                      key={acc.id}
+                      className={`bg-[#12141e] border rounded-3xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5 transition-all ${
+                        isApproved ? 'border-emerald-500/30 hover:border-emerald-500/50' : 'border-amber-500/30 hover:border-amber-500/50'
+                      }`}
+                    >
+                      {/* Account Details */}
+                      <div className="space-y-2 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-base font-black text-white">
+                            {acc.accountName || acc.title}
+                          </span>
+                          <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-600/20 text-red-400 font-bold border border-red-500/30">
+                            {acc.level || `LVL ${acc.accountLevel || '70'}`}
+                          </span>
+                          {acc.ownerName && (
+                            <span className="text-xs text-slate-400">
+                              (المالك: {acc.ownerName})
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Specs row */}
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+                          {acc.mythicsCount && (
+                            <span className="px-2 py-0.5 rounded-lg bg-white/5 text-amber-300 font-mono">
+                              ⭐ {acc.mythicsCount} ميثيك
+                            </span>
+                          )}
+                          {acc.upgradableWeaponsCount && (
+                            <span className="px-2 py-0.5 rounded-lg bg-white/5 text-red-300">
+                              🔫 {acc.upgradableWeaponsCount}
+                            </span>
+                          )}
+                          {acc.carsCount && (
+                            <span className="px-2 py-0.5 rounded-lg bg-white/5 text-blue-300">
+                              🏎️ {acc.carsCount} سيارات
+                            </span>
+                          )}
+                          {acc.linkedServices && (
+                            <span className="px-2 py-0.5 rounded-lg bg-white/5 text-slate-400">
+                              🔗 {acc.linkedServices}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Verification info: Seller Phone & Transfer Phone */}
+                        <div className="flex flex-wrap items-center gap-3 pt-1 text-xs">
+                          {sellerNumber && (
+                            <div className="flex items-center gap-1.5 text-slate-300 bg-white/5 px-2.5 py-1 rounded-xl">
+                              <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>هاتف البائع: <strong className="text-white font-mono">{sellerNumber}</strong></span>
+                              <a
+                                href={`tel:${sellerNumber}`}
+                                className="text-emerald-400 hover:underline mr-1 font-bold"
+                              >
+                                اتصال
+                              </a>
+                              <a
+                                href={`https://wa.me/${cleanSellerPhone.startsWith('218') ? cleanSellerPhone : '218' + cleanSellerPhone.replace(/^0+/, '')}?text=${encodeURIComponent('السلام عليكم بخصوص حساب ببجي المعروض في متجر RTG Gear X')}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-emerald-400 hover:underline mr-1 font-bold flex items-center gap-0.5"
+                              >
+                                <MessageCircle className="w-3 h-3" />
+                                واتساب
+                              </a>
+                            </div>
+                          )}
+
+                          {acc.transferPhone && (
+                            <div className="flex items-center gap-1.5 text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-xl font-bold">
+                              <span>الرقم المحول منه 5 د.ل: <strong className="font-mono">{acc.transferPhone}</strong></span>
+                            </div>
+                          )}
+
+                          {acc.videoUrl && (
+                            <a
+                              href={acc.videoUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-blue-400 hover:underline flex items-center gap-1 bg-blue-500/10 px-2.5 py-1 rounded-xl"
+                            >
+                              <span>فيديو الاستعراض</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Price & Approval Toggle Controls */}
+                      <div className="flex md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-3 pt-3 md:pt-0 border-t md:border-t-0 border-white/5">
+                        <div className="text-right">
+                          <span className="text-lg font-black text-red-500 font-mono">
+                            {acc.price || acc.salePrice} د.ل
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* Toggle Button (نعم / لا) */}
+                          <button
+                            onClick={() => handleToggleAccountDisplay(acc.id, acc.displayOnSite || (isApproved ? 'نعم' : 'لا'))}
+                            className={`px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 ${
+                              isApproved
+                                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/60'
+                                : 'bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white shadow-red-950/60'
                             }`}
                           >
-                            {sub.status === 'approved' && <Check className="w-3.5 h-3.5" />}
-                            {sub.status === 'rejected' && <X className="w-3.5 h-3.5" />}
-                            {sub.status === 'pending' && <Clock className="w-3.5 h-3.5" />}
-                            <span>
-                              {sub.status === 'approved'
-                                ? 'معتمد ومنشور في المتجر'
-                                : sub.status === 'rejected'
-                                ? 'مرفوض'
-                                : 'قيد المراجعة والتدقيق'}
-                            </span>
-                          </span>
-
-                          <span className="text-xs text-slate-400 font-mono">
-                            📅 {sub.date}
-                          </span>
-                        </div>
-
-                        <h3 className="text-lg font-black text-white flex items-center gap-2">
-                          <span>{sub.accountName}</span>
-                          <span className="px-2 py-0.5 rounded-md bg-white/10 text-amber-300 text-xs font-bold">
-                            LVL {sub.accountLevel}
-                          </span>
-                        </h3>
-                      </div>
-
-                      {/* Right: Price & Fee Status */}
-                      <div className="flex flex-wrap items-center gap-4">
-                        <div className="text-right">
-                          <span className="text-[11px] text-slate-400 block">سعر البيع المطلوب:</span>
-                          <span className="text-xl font-black text-amber-400 font-mono">
-                            {sub.salePrice} د.ل
-                          </span>
-                        </div>
-
-                        <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-right">
-                          <span className="text-[10px] text-amber-300 font-bold block">رقم تحويل رسوم 5 ليرات:</span>
-                          <span className="text-xs font-mono font-bold text-white dir-ltr">
-                            {sub.transferPhone || 'غير مدخل'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Detailed Specifications Grid */}
-                    <div className="py-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 border-b border-white/5 text-xs">
-                      <div className="p-3 rounded-xl bg-white/5">
-                        <span className="text-slate-400 block text-[11px]">مستوى القوة:</span>
-                        <strong className="text-white mt-0.5 block">{sub.powerLevel || '—'}</strong>
-                      </div>
-                      <div className="p-3 rounded-xl bg-white/5">
-                        <span className="text-slate-400 block text-[11px]">ميثيك عادي:</span>
-                        <strong className="text-purple-300 mt-0.5 block">{sub.mythicsCount || '0'}</strong>
-                      </div>
-                      <div className="p-3 rounded-xl bg-white/5">
-                        <span className="text-slate-400 block text-[11px]">ميثيك ذهبي:</span>
-                        <strong className="text-amber-300 mt-0.5 block">{sub.goldenMythicsCount || '0'}</strong>
-                      </div>
-                      <div className="p-3 rounded-xl bg-white/5">
-                        <span className="text-slate-400 block text-[11px]">سكنات السيارات:</span>
-                        <strong className="text-cyan-300 mt-0.5 block">{sub.carsCount || '0'}</strong>
-                      </div>
-                      <div className="p-3 rounded-xl bg-white/5">
-                        <span className="text-slate-400 block text-[11px]">الهاشتاجات:</span>
-                        <strong className="text-white mt-0.5 block">{sub.hashtagsCount || '0'}</strong>
-                      </div>
-                      <div className="p-3 rounded-xl bg-white/5">
-                        <span className="text-slate-400 block text-[11px]">روابط الربط:</span>
-                        <strong className="text-amber-200 mt-0.5 block truncate" title={sub.linkedAccounts}>
-                          {sub.linkedAccounts || '—'}
-                        </strong>
-                      </div>
-                    </div>
-
-                    {/* Weapons & Extra info */}
-                    <div className="py-4 space-y-2 text-xs">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                        <span className="text-slate-400 font-bold min-w-[140px]">الأسلحة المطورة:</span>
-                        <span className="text-white font-medium bg-white/5 px-3 py-1.5 rounded-lg flex-1">
-                          {sub.upgradableWeapons || 'لا يوجد أسلحة مطورة محددة'}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                        <span className="text-slate-400 font-bold min-w-[140px]">بيانات البائع:</span>
-                        <span className="text-slate-200">
-                          {sub.fullName} ({sub.phone})
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Actions Bar */}
-                    <div className="pt-4 flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        {sub.videoUrl && (
-                          <button
-                            onClick={() => setPreviewVideoUrl(sub.videoUrl || null)}
-                            className="px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs flex items-center gap-2 border border-amber-500/30 transition-colors"
-                          >
-                            <Video className="w-4 h-4" />
-                            <span>مشاهدة فيديو الحساب</span>
+                            {isApproved ? (
+                              <>
+                                <Eye className="w-4 h-4" />
+                                <span>معروض بالموقع (نعم)</span>
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="w-4 h-4" />
+                                <span>مخفي (لا) - اضغط للعرض</span>
+                              </>
+                            )}
                           </button>
-                        )}
 
-                        <a
-                          href={`https://wa.me/${sub.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                            `مرحباً ${sub.fullName}، بخصوص طلب عرض حساب ببجي (${sub.accountName}) في متجر RTG Gear X:`
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center gap-2 border border-white/10 transition-colors"
-                        >
-                          <Phone className="w-4 h-4 text-emerald-400" />
-                          <span>مراسلة البائع واتساب</span>
-                        </a>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {sub.status !== 'approved' && (
                           <button
                             onClick={() => {
-                              approvePubgSubmission(sub.id);
-                              showToast('تمت الموافقة على الحساب وإدراجه بنجاح في متجر حسابات ببجي المعروضة!');
+                              if (confirm(`هل أنت متأكد من حذف الحساب "${acc.accountName || acc.title}"؟`)) {
+                                deletePubgAccount(acc.id);
+                                showToast('success', 'تم حذف الحساب بنجاح');
+                              }
                             }}
-                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/60 transition-all"
+                            className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                            title="حذف الحساب"
                           >
-                            <Check className="w-4 h-4" />
-                            <span>موافقة ونشر في المتجر فوراً</span>
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                        )}
-
-                        {sub.status === 'pending' && (
-                          <button
-                            onClick={() => {
-                              rejectPubgSubmission(sub.id);
-                              showToast('تم تغيير حالة الطلب إلى مرفوض');
-                            }}
-                            className="px-4 py-2.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-300 font-bold text-xs flex items-center gap-2 border border-red-500/30 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                            <span>رفض الطلب</span>
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => {
-                            if (confirm('هل تريد حذف هذا الطلب نهائياً؟')) {
-                              deletePubgSubmission(sub.id);
-                              showToast('تم حذف الطلب');
-                            }
-                          }}
-                          className="p-2.5 rounded-xl bg-white/5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
-                          title="حذف الطلب"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1184,402 +930,230 @@ export const AdminDashboard: React.FC = () => {
 
         {/* TAB 3: PUBG UC PACKAGES */}
         {activeTab === 'pubg_uc' && (
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">إدارة باقات شدات PUBG</h2>
-              {!isAddingUc && !editingUc && (
-                <button
-                  onClick={() => {
-                    setIsAddingUc(true);
-                    setEditingUc(null);
-                    setUcForm({
-                      ucAmount: 1000,
-                      bonusUc: 100,
-                      price: 150,
-                      isPopular: false,
-                    });
-                  }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-950/60"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>إضافة باقة جديدة</span>
-                </button>
-              )}
-            </div>
-
-            {/* UC Form */}
-            {(isAddingUc || editingUc) && (
-              <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 space-y-4 animate-fadeIn">
-                <h3 className="text-lg font-bold text-white">
-                  {editingUc ? 'تعديل الباقة' : 'إضافة باقة شدات'}
-                </h3>
-
-                <form onSubmit={handleSaveUc} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">كمية الـ UC</label>
-                      <input
-                        type="number"
-                        required
-                        value={ucForm.ucAmount}
-                        onChange={(e) => setUcForm({ ...ucForm, ucAmount: Number(e.target.value) })}
-                        className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm font-mono outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">الشدات المجانية (Bonus)</label>
-                      <input
-                        type="number"
-                        value={ucForm.bonusUc}
-                        onChange={(e) => setUcForm({ ...ucForm, bonusUc: Number(e.target.value) })}
-                        className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm font-mono outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1">السعر (د.ل)</label>
-                      <input
-                        type="number"
-                        required
-                        value={ucForm.price}
-                        onChange={(e) => setUcForm({ ...ucForm, price: Number(e.target.value) })}
-                        className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm font-mono outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <label className="text-xs font-bold text-slate-300 flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ucForm.isPopular}
-                      onChange={(e) => setUcForm({ ...ucForm, isPopular: e.target.checked })}
-                      className="w-4 h-4 accent-amber-500 rounded"
-                    />
-                    <span>تمييز كباقة (الأكثر طلباً ⭐)</span>
-                  </label>
-
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      type="submit"
-                      className="px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>حفظ</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsAddingUc(false);
-                        setEditingUc(null);
-                      }}
-                      className="px-4 py-2.5 bg-white/5 text-slate-400 rounded-xl text-xs font-bold"
-                    >
-                      إلغاء
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {/* UC Cards List */}
-            {ucPackages.length === 0 ? (
-              <div className="text-center py-16 bg-[#12141e] border border-white/10 rounded-3xl p-8">
-                <Zap className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-                <h3 className="text-base font-bold text-white mb-1">لا توجد باقات شدات مضافة حالياً</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  اضغط على زر "إضافة باقة جديدة" لإدخال كميات الـ UC، البونص المجاني، والسعر، وستُحفظ مباشرة في Google Sheets.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {ucPackages.map((pkg) => (
-                  <div
-                    key={pkg.id}
-                    className="p-5 rounded-3xl bg-[#12141e] border border-white/10 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-black text-white font-mono">{pkg.ucAmount} UC</span>
-                        {pkg.bonusUc > 0 && (
-                          <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded">
-                            +{pkg.bonusUc}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-sm font-black text-amber-400 font-mono mt-1 block">
-                        {pkg.price} د.ل
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => startEditUc(pkg)}
-                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300"
-                        title="تعديل"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          deleteUcPackage(pkg.id);
-                          showToast(`تم حذف باقة ${pkg.ucAmount} UC بنجاح`);
-                        }}
-                        className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
-                        title="حذف"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 4: ORDERS LOG */}
-        {activeTab === 'orders' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">سجل طلبات العملاء</h2>
-              <span className="text-xs text-slate-400">
-                يتم حفظ كل طلب يُرسل عبر الموقع لمتابعته
-              </span>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-400" />
+                <span>إدارة باقات شدات PUBG Mobile</span>
+              </h2>
+
+              <button
+                onClick={() => setIsAddingUc(!isAddingUc)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{isAddingUc ? 'إلغاء' : 'إضافة باقة شدات جديدة'}</span>
+              </button>
             </div>
 
-            {orders.length === 0 ? (
-              <div className="p-12 text-center bg-[#12141e] border border-white/5 rounded-3xl text-slate-400 text-sm">
-                لا توجد طلبات مسجلة بعد. عند قيام العميل بالطلب ستظهر كافة بياناته هنا.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {orders.map((ord) => (
-                  <div
-                    key={ord.id}
-                    className="p-6 rounded-3xl bg-[#12141e] border border-white/10 space-y-3"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-xs text-slate-400">#{ord.id}</span>
-                        <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-white/10 text-white">
-                          {ord.type === 'gear' ? 'معدات' : ord.type === 'pubg_uc' ? 'شدات PUBG' : 'حساب PUBG'}
-                        </span>
-                        <span className="text-xs text-slate-500">{ord.date}</span>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <select
-                          value={ord.status}
-                          onChange={(e) => updateOrderStatus(ord.id, e.target.value as Order['status'])}
-                          className="bg-[#181b27] border border-white/10 text-xs text-white rounded-xl py-1.5 px-3 outline-none cursor-pointer"
-                        >
-                          <option value="pending">معلق (Pending)</option>
-                          <option value="processing">قيد التنفيذ</option>
-                          <option value="completed">مكتمل (Completed)</option>
-                          <option value="cancelled">ملغي</option>
-                        </select>
-
-                        <button
-                          onClick={() => {
-                            deleteOrder(ord.id);
-                            showToast(`تم حذف الطلب #${ord.id} بنجاح`);
-                          }}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-300">
-                      <div>
-                        <span className="text-slate-500 block">العميل:</span>
-                        <span className="font-bold text-white">{ord.customerName}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">الهاتف:</span>
-                        <span className="font-mono text-white" dir="ltr">{ord.phone}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 block">الإجمالي:</span>
-                        <span className="font-mono font-bold text-red-400">{ord.total} د.ل</span>
-                      </div>
-                    </div>
-
-                    {ord.city && (
-                      <div className="text-xs text-slate-400">
-                        <span>العنوان: {ord.city} - {ord.region} | الدفع: {ord.paymentMethod}</span>
-                      </div>
-                    )}
-
-                    {ord.pubgId && (
-                      <div className="text-xs text-amber-300 font-mono">
-                        <span>PUBG ID: {ord.pubgId} | الباقة: {ord.packageName}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 5: GOOGLE SHEETS INTEGRATION */}
-        {activeTab === 'google_sheets' && (
-          <GoogleSheetsManager />
-        )}
-
-        {/* TAB 6: STORE SETTINGS */}
-        {activeTab === 'settings' && (
-          <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6">
-            <h2 className="text-xl font-bold text-white pb-4 border-b border-white/10">
-              إعدادات المتجر ومعلومات التواصل
-            </h2>
-
-            <form onSubmit={handleSaveSettings} className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">اسم المتجر</label>
-                  <input
-                    type="text"
-                    value={settingsForm.storeName}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, storeName: e.target.value })}
-                    className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
-                    رقم الواتساب لاستلام الطلبات (أرقام دولية بدون +)
-                  </label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={settingsForm.whatsappNumber}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
-                    placeholder="218934590635"
-                    className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm font-mono text-left outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">رقم الهاتف المعروض</label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={settingsForm.phoneDisplay}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, phoneDisplay: e.target.value })}
-                    placeholder="+218 93 459 0635"
-                    className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm font-mono text-left outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">حساب TikTok</label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={settingsForm.tiktokHandle}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, tiktokHandle: e.target.value })}
-                    className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm font-mono text-left outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">حساب Instagram</label>
-                  <input
-                    type="text"
-                    dir="ltr"
-                    value={settingsForm.instagramHandle}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, instagramHandle: e.target.value })}
-                    className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm font-mono text-left outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">نص "عن المتجر"</label>
-                <textarea
-                  rows={4}
-                  value={settingsForm.aboutText}
-                  onChange={(e) => setSettingsForm({ ...settingsForm, aboutText: e.target.value })}
-                  className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm outline-none resize-none leading-relaxed"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">نص التوصيل</label>
-                  <input
-                    type="text"
-                    value={settingsForm.shippingText}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, shippingText: e.target.value })}
-                    className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">نص أوقات العمل</label>
-                  <input
-                    type="text"
-                    value={settingsForm.hoursText}
-                    onChange={(e) => setSettingsForm({ ...settingsForm, hoursText: e.target.value })}
-                    className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Admin Login Credentials Section */}
-              <div className="pt-6 border-t border-white/10 space-y-4">
-                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4" />
-                  <span>تغيير بيانات تسجيل دخول لوحة التحكم (Username & Password)</span>
+            {/* Add UC Form */}
+            {isAddingUc && (
+              <form onSubmit={handleUcSubmit} className="bg-[#151824] border border-white/10 rounded-3xl p-6 shadow-xl space-y-4 animate-fadeIn">
+                <h3 className="text-sm font-bold text-white pb-3 border-b border-white/10">
+                  إضافة باقة شدات جديدة إلى Google Sheet
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">اسم المستخدم للإدارة (Admin Username)</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">كمية الشدات الأساسية (UC) *</label>
                     <input
-                      type="text"
-                      defaultValue={localStorage.getItem('rtg_admin_user') || 'admin'}
-                      onChange={(e) => {
-                        if (e.target.value.trim()) {
-                          localStorage.setItem('rtg_admin_user', e.target.value.trim());
-                        }
-                      }}
-                      className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm outline-none font-mono"
+                      type="number"
+                      required
+                      min="1"
+                      value={ucForm.ucAmount || ''}
+                      onChange={(e) => setUcForm({ ...ucForm, ucAmount: Number(e.target.value) })}
+                      placeholder="مثال: 660"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
                     />
                   </div>
+
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">كلمة المرور الجديدة (Admin Password)</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">شدات إضافية مجانية (Bonus)</label>
                     <input
-                      type="text"
-                      defaultValue={localStorage.getItem('rtg_admin_pass') || 'rtg2026'}
-                      onChange={(e) => {
-                        if (e.target.value.trim()) {
-                          localStorage.setItem('rtg_admin_pass', e.target.value.trim());
-                        }
-                      }}
-                      className="w-full bg-[#181b27] border border-white/10 rounded-xl py-2.5 px-4 text-white text-sm outline-none font-mono"
+                      type="number"
+                      min="0"
+                      value={ucForm.bonusUc || ''}
+                      onChange={(e) => setUcForm({ ...ucForm, bonusUc: Number(e.target.value) })}
+                      placeholder="مثال: 60"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">السعر (دينار ليبي) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={ucForm.price || ''}
+                      onChange={(e) => setUcForm({ ...ucForm, price: Number(e.target.value) })}
+                      placeholder="مثال: 35"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="uc-is-popular"
+                      checked={ucForm.isPopular}
+                      onChange={(e) => setUcForm({ ...ucForm, isPopular: e.target.checked })}
+                      className="w-4 h-4 rounded text-red-600 focus:ring-0 bg-[#0e1017] border-white/10"
+                    />
+                    <label htmlFor="uc-is-popular" className="text-xs font-bold text-slate-300 cursor-pointer">
+                      تمييز هذه الباقة كـ "الأكثر طلباً"
+                    </label>
                   </div>
                 </div>
-              </div>
 
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-2xl shadow-xl shadow-emerald-950/60 flex items-center gap-2"
-                >
-                  <Save className="w-5 h-5" />
-                  <span>حفظ جميع الإعدادات</span>
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingUc(false)}
+                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg"
+                  >
+                    إضافة الباقة
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* UC Packages Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {ucPackages.map((pkg) => (
+                <div key={pkg.id} className="bg-[#12141e] border border-white/10 hover:border-amber-500/30 rounded-2xl p-4 flex flex-col justify-between gap-3 shadow-md relative overflow-hidden group">
+                  {pkg.isPopular && (
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                      الأكثر طلباً 🔥
+                    </span>
+                  )}
+
+                  <div className="pt-2">
+                    <div className="flex items-center gap-2 text-amber-400 font-mono font-black text-xl">
+                      <Zap className="w-5 h-5 fill-amber-400" />
+                      <span>{pkg.ucAmount} UC</span>
+                    </div>
+                    {pkg.bonusUc > 0 && (
+                      <span className="text-[11px] text-emerald-400 font-bold block mt-1">
+                        + {pkg.bonusUc} UC مجاناً
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                    <span className="text-base font-black text-white font-mono">{pkg.price} د.ل</span>
+                    <button
+                      onClick={() => {
+                        if (confirm(`حذف باقة ${pkg.ucAmount} UC؟`)) {
+                          deleteUcPackage(pkg.id);
+                          showToast('success', 'تم حذف الباقة بنجاح');
+                        }
+                      }}
+                      className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                      title="حذف الباقة"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
+
+        {/* TAB 4: GOOGLE SHEETS APPS SCRIPT SYNC */}
+        {activeTab === 'sheets_sync' && (
+          <div className="space-y-6">
+            <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 shadow-xl space-y-6">
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <Link2 className="w-5 h-5 text-red-500" />
+                  <span>ربط وجلب بيانات المتجر من Google Sheet</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  ضع رابط تطبيق الويب (Google Apps Script Web App URL) واضغط على جلب البيانات لربط الموقع تلقائياً بجدول البيانات الخاص بك.
+                </p>
+              </div>
+
+              {/* Input Box for Apps Script Web App URL */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-300">
+                  رابط تطبيق الويب (Google Apps Script Web App URL) *
+                </label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <input
+                    type="url"
+                    value={webAppUrl}
+                    onChange={(e) => setWebAppUrl(e.target.value)}
+                    placeholder="https://script.google.com/macros/s/.../exec"
+                    dir="ltr"
+                    className="flex-1 px-4 py-3 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs font-mono focus:border-red-500 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSaveAndSync}
+                    disabled={isManualSyncing || isAppsScriptSyncing}
+                    className="px-6 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white rounded-xl font-bold text-xs shadow-lg shadow-red-950/60 transition-all flex items-center justify-center gap-2 flex-shrink-0 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isManualSyncing || isAppsScriptSyncing ? 'animate-spin' : ''}`} />
+                    <span>حفظ وجلب البيانات من Google Sheet</span>
+                  </button>
+                </div>
+
+                {appsScriptConfig.lastSyncedAt && (
+                  <p className="text-[11px] text-emerald-400 font-mono mt-1">
+                    ✓ آخر مزامنة ناجحة: {appsScriptConfig.lastSyncedAt}
+                  </p>
+                )}
+              </div>
+
+              {/* 3 Step Setup Guide */}
+              <div className="bg-[#151824] border border-white/10 rounded-2xl p-5 space-y-3">
+                <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>طريقة الحصول على الرابط في 3 خطوات سريعة:</span>
+                </h3>
+                <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                  <li>افتح جدول Google Sheet واضغط من القائمة العلوية على (<strong>الإضافات / Extensions</strong>) ثم (<strong>Apps Script</strong>).</li>
+                  <li>امسح أي كود موجود والصق الكود الموجود أدناه، ثم اضغط حفظ (Save).</li>
+                  <li>اضغط على الزر الأزرق (<strong>Deploy / نشر</strong>) ثم (<strong>New deployment / نشر جديد</strong>)، واختر نوع <strong>Web app</strong>، واجعل <strong>Who has access: Anyone (أي شخص)</strong>، ثم انسخ الرابط وضعه في الخانة بالأعلى.</li>
+                </ol>
+              </div>
+
+              {/* Copy Script Box */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300">
+                    كود Apps Script الكامل والمعدل لجدول بياناتك:
+                  </label>
+                  <button
+                    onClick={handleCopyCode}
+                    className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition-colors"
+                  >
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{isCopied ? 'تم النسخ!' : 'نسخ الكود بالكامل'}</span>
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <textarea
+                    readOnly
+                    rows={12}
+                    dir="ltr"
+                    value={GOOGLE_APPS_SCRIPT_TEMPLATE}
+                    className="w-full p-4 rounded-2xl bg-[#090a0f] border border-white/10 text-slate-300 font-mono text-[11px] leading-relaxed focus:outline-none resize-none select-all"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

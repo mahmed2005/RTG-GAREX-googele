@@ -74,8 +74,10 @@ interface StoreContextType {
 
   submitSellAccount: (data: Omit<PubgSellSubmission, 'id' | 'date' | 'status'>) => void;
 
-  // PUBG Submissions Management
+  // PUBG Submissions Management & Display toggle
   pubgSubmissions: PubgSellSubmission[];
+  allPubgAccounts: PubgAccount[];
+  togglePubgDisplay: (id: string, newDisplay: 'نعم' | 'لا') => Promise<void>;
   approvePubgSubmission: (id: string) => void;
   rejectPubgSubmission: (id: string) => void;
   deletePubgSubmission: (id: string) => void;
@@ -132,6 +134,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [pubgAccounts, setPubgAccounts] = useState<PubgAccount[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.PUBG_ACCOUNTS);
+      return saved ? JSON.parse(saved) : INITIAL_PUBG_ACCOUNTS;
+    } catch {
+      return INITIAL_PUBG_ACCOUNTS;
+    }
+  });
+
+  const [allPubgAccounts, setAllPubgAccounts] = useState<PubgAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem('rtg_all_pubg_accounts_v2');
       return saved ? JSON.parse(saved) : INITIAL_PUBG_ACCOUNTS;
     } catch {
       return INITIAL_PUBG_ACCOUNTS;
@@ -210,11 +221,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.pubgAccounts && Array.isArray(data.pubgAccounts)) {
         setPubgAccounts(data.pubgAccounts);
       }
+      if (data.allPubgAccounts && Array.isArray(data.allPubgAccounts) && data.allPubgAccounts.length > 0) {
+        setAllPubgAccounts(data.allPubgAccounts);
+      } else if (data.pubgAccounts && Array.isArray(data.pubgAccounts)) {
+        setAllPubgAccounts(data.pubgAccounts);
+      }
       if (data.pubgSubmissions && Array.isArray(data.pubgSubmissions)) {
         setPubgSubmissions(data.pubgSubmissions);
       }
       if (data.ucPackages && Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
         setUcPackages(data.ucPackages);
+      }
+      if (data.settings && typeof data.settings === 'object') {
+        setSettings((prev) => ({ ...prev, ...data.settings }));
       }
     } catch (e) {
       console.warn('Could not auto-fetch from Google Apps Script:', e);
@@ -239,6 +258,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PUBG_ACCOUNTS, JSON.stringify(pubgAccounts));
   }, [pubgAccounts]);
+
+  useEffect(() => {
+    localStorage.setItem('rtg_all_pubg_accounts_v2', JSON.stringify(allPubgAccounts));
+  }, [allPubgAccounts]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.UC_PACKAGES, JSON.stringify(ucPackages));
@@ -652,8 +675,62 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Toggle PUBG Account Display on website ("نعم" / "لا")
+  const togglePubgDisplay = async (id: string, newDisplay: 'نعم' | 'لا') => {
+    const isApproved = newDisplay === 'نعم';
+
+    // 1. Update allPubgAccounts
+    setAllPubgAccounts((prev) =>
+      prev.map((acc) =>
+        acc.id === id
+          ? {
+              ...acc,
+              displayOnSite: newDisplay,
+              approved: isApproved,
+              status: isApproved ? 'approved' : 'pending',
+              isAvailable: isApproved,
+            }
+          : acc
+      )
+    );
+
+    // 2. Update pubgAccounts (Visible on public site)
+    setPubgAccounts((prev) => {
+      if (isApproved) {
+        const target = allPubgAccounts.find((a) => a.id === id);
+        if (target) {
+          const approvedAcc: PubgAccount = {
+            ...target,
+            displayOnSite: 'نعم',
+            approved: true,
+            status: 'approved',
+            isAvailable: true,
+          };
+          const exists = prev.some((a) => a.id === id);
+          return exists
+            ? prev.map((a) => (a.id === id ? approvedAcc : a))
+            : [approvedAcc, ...prev];
+        }
+        return prev;
+      } else {
+        return prev.filter((a) => a.id !== id);
+      }
+    });
+
+    // 3. Send update to Google Apps Script Web App
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      try {
+        await AppsScriptService.setPubgDisplay(appsScriptConfig.webAppUrl, id, newDisplay);
+      } catch (err) {
+        console.error('Error toggling PUBG account display in Google Sheets:', err);
+      }
+    }
+  };
+
   const deletePubgAccount = (id: string) => {
     setPubgAccounts((prev) => prev.filter((item) => item.id !== id));
+    setAllPubgAccounts((prev) => prev.filter((item) => item.id !== id));
     setPubgSubmissions((prev) => prev.filter((s) => s.id !== id));
 
     // Delete from Google Sheets Apps Script
@@ -760,6 +837,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         submitAccountOrder,
         submitSellAccount,
         pubgSubmissions,
+        allPubgAccounts,
+        togglePubgDisplay,
         approvePubgSubmission,
         rejectPubgSubmission,
         deletePubgSubmission,

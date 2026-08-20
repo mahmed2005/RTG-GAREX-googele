@@ -18,9 +18,14 @@ export const PubgAccountsPage: React.FC = () => {
   const { 
     pubgAccounts, 
     setSelectedAccountForBuy, 
-    setIsSellAccountOpen,
-    setPreviewVideoUrl 
+    setPreviewVideoUrl,
+    settings
   } = useStore();
+
+  const handleOpenGoogleForm = () => {
+    const formUrl = settings.googleFormUrl || 'https://forms.gle/LCS6CgXUWciHH21k8';
+    window.open(formUrl, '_blank');
+  };
 
   // Filter only available and approved accounts
   const visibleAccounts = pubgAccounts.filter(
@@ -46,7 +51,7 @@ export const PubgAccountsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Sell Your Account Banner */}
+        {/* Sell Your Account Banner - Redirects directly to Google Form */}
         <div className="mb-10 max-w-3xl mx-auto">
           <div className="bg-[#151824] border border-white/10 hover:border-red-500/30 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-right shadow-xl">
             <div className="flex items-center gap-4">
@@ -58,18 +63,18 @@ export const PubgAccountsPage: React.FC = () => {
                   تريد بيع حسابك؟
                 </h3>
                 <p className="text-slate-400 text-xs">
-                  أرسل بيانات حسابك وفيديو الاستعراض وسنعرضه في المتجر بعد المراجعة والاعتماد
+                  اضغط لتعبئة نموذج Google Form الرسمي وسيتم مراجعة حسابك واعتماده للعرض بالمتجر
                 </p>
               </div>
             </div>
 
             <button
-              id="open-sell-account-modal-btn"
-              onClick={() => setIsSellAccountOpen(true)}
+              id="open-sell-account-google-form-btn"
+              onClick={handleOpenGoogleForm}
               className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-500 active:scale-95 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-red-950/60 transition-all flex items-center justify-center gap-2 flex-shrink-0"
             >
-              <Plus className="w-4 h-4" />
-              <span>اعرض حسابك الآن</span>
+              <span>اعرض حسابك للبيع</span>
+              <ExternalLink className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -82,13 +87,14 @@ export const PubgAccountsPage: React.FC = () => {
             </div>
             <h3 className="text-lg font-bold text-white mb-2">لا توجد حسابات معروضة حالياً</h3>
             <p className="text-slate-400 text-xs leading-relaxed mb-6">
-              كن أول من يعرض حسابه للبيع في المتجر! املأ نموذج بيع الحساب وسيتم إضافته إلى Google Sheet واعتماده للعرض فوراً.
+              كن أول من يعرض حسابه للبيع في المتجر! املأ نموذج Google Form وسيتم إضافته إلى Google Sheet واعتماده للعرض فوراً.
             </p>
             <button
-              onClick={() => setIsSellAccountOpen(true)}
-              className="px-6 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl text-xs font-bold shadow-lg transition-all"
+              onClick={handleOpenGoogleForm}
+              className="px-6 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-2xl text-xs font-bold shadow-lg transition-all flex items-center justify-center gap-2 mx-auto"
             >
-              + إضافة وعرض حسابك الآن
+              <span>+ اعرض حسابك للبيع الآن</span>
+              <ExternalLink className="w-4 h-4" />
             </button>
           </div>
         ) : (

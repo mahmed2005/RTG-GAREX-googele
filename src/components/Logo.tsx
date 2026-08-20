@@ -28,10 +28,10 @@ export const Logo: React.FC<LogoProps> = ({
   };
 
   const subSizes = {
-    sm: 'text-[8px] tracking-[0.2em]',
-    md: 'text-[10px] tracking-[0.22em]',
-    lg: 'text-xs tracking-[0.25em]',
-    xl: 'text-sm tracking-[0.3em]',
+    sm: 'text-[6.5px] tracking-[0.16em]',
+    md: 'text-[7.5px] tracking-[0.18em]',
+    lg: 'text-[9.5px] tracking-[0.2em]',
+    xl: 'text-[11px] tracking-[0.22em]',
   };
 
   return (
