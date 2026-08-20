@@ -517,12 +517,14 @@ export const AdminDashboard: React.FC = () => {
                       onChange={(e) => setProductForm({ ...productForm, category: e.target.value as Category })}
                       className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
                     >
+                      <option value="كاميرات مراقبة">كاميرات مراقبة</option>
                       <option value="سماعات">سماعات</option>
                       <option value="كيبورد">كيبوردات</option>
                       <option value="ماوس">ماوسات</option>
                       <option value="ميكروفونات">ميكروفونات</option>
                       <option value="مبردات">مبردات</option>
                       <option value="كروت شاشة">كروت شاشة</option>
+                      <option value="إكسسوارات">إكسسوارات</option>
                       <option value="الكل">أخرى / عام</option>
                     </select>
                   </div>

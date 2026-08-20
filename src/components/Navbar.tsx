@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { useStore, PageType } from '../context/StoreContext';
 import { Logo } from './Logo';
 import { MobileDrawer } from './MobileDrawer';
-import { ShoppingBag, Menu, Settings } from 'lucide-react';
+import { SearchModal } from './SearchModal';
+import { ShoppingBag, Menu, Settings, Search } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { currentPage, setCurrentPage, cartItemsCount, setIsCartOpen } = useStore();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const navLinks: { id: PageType; label: string }[] = [
     { id: 'home', label: 'الرئيسية' },
@@ -23,8 +25,8 @@ export const Navbar: React.FC = () => {
         className="sticky top-0 z-40 w-full bg-[#0e1017]/90 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/40"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          {/* Right Side: Hamburger (Mobile) + Cart Button */}
-          <div className="flex items-center gap-3">
+          {/* Right Side: Hamburger (Mobile) + Search Button + Cart Button */}
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Mobile Hamburger Menu */}
             <button
               id="mobile-menu-toggle-btn"
@@ -33,6 +35,17 @@ export const Navbar: React.FC = () => {
               aria-label="فتح القائمة"
             >
               <Menu className="w-6 h-6" />
+            </button>
+
+            {/* Global Search Button */}
+            <button
+              id="header-search-btn"
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-all hover:border-red-500/40 group flex items-center gap-2"
+              aria-label="بحث شامل في المتجر"
+            >
+              <Search className="w-5 h-5 text-slate-300 group-hover:text-red-400 transition-colors" />
+              <span className="hidden sm:inline text-xs font-bold text-slate-300 group-hover:text-white">بحث</span>
             </button>
 
             {/* Shopping Cart Button */}
@@ -87,11 +100,19 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
+      {/* Global Search Modal */}
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
+
       {/* Mobile Drawer */}
       <MobileDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
+        onOpenSearch={() => setIsSearchOpen(true)}
       />
     </>
   );
 };
+

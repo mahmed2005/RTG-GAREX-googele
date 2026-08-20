@@ -11,15 +11,17 @@ import {
   X, 
   Settings, 
   MessageCircle,
-  ExternalLink
+  ExternalLink,
+  Search
 } from 'lucide-react';
 
 interface MobileDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenSearch?: () => void;
 }
 
-export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) => {
+export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose, onOpenSearch }) => {
   const { currentPage, setCurrentPage, settings } = useStore();
 
   if (!isOpen) return null;
@@ -35,6 +37,13 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
   const handleNav = (page: PageType) => {
     setCurrentPage(page);
     onClose();
+  };
+
+  const handleSearchClick = () => {
+    onClose();
+    if (onOpenSearch) {
+      onOpenSearch();
+    }
   };
 
   return (
@@ -65,8 +74,22 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
             </button>
           </div>
 
+          {/* Quick Search Button in Mobile Menu */}
+          <button
+            onClick={handleSearchClick}
+            className="w-full mt-4 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-red-500/40 rounded-xl flex items-center justify-between text-slate-300 text-xs font-bold transition-all"
+          >
+            <span className="flex items-center gap-2">
+              <Search className="w-4 h-4 text-red-400" />
+              <span>بحث شامل في المتجر...</span>
+            </span>
+            <span className="text-[10px] bg-red-600/20 text-red-400 px-2 py-0.5 rounded-md font-mono">
+              بحث
+            </span>
+          </button>
+
           {/* Navigation Links */}
-          <nav className="mt-6 flex flex-col gap-2">
+          <nav className="mt-4 flex flex-col gap-2">
             {navItems.map((item) => {
               const isActive = currentPage === item.id;
               const isAdmin = item.id === 'admin';
@@ -124,3 +147,4 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose }) =
     </div>
   );
 };
+

@@ -10,12 +10,14 @@ export const ProductsPage: React.FC = () => {
 
   const categories: Category[] = [
     'الكل',
+    'كاميرات مراقبة',
     'سماعات',
     'مبردات',
     'كروت شاشة',
     'ميكروفونات',
     'كيبورد',
     'ماوس',
+    'إكسسوارات',
   ];
 
   const filteredProducts = products.filter((p) => {
