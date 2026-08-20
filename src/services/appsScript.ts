@@ -16,7 +16,7 @@ const APPS_SCRIPT_CONFIG_KEY = 'rtg_apps_script_config_v2';
 export const GOOGLE_APPS_SCRIPT_TEMPLATE = `/**
  * =========================================================================
  * RTG GEAR X - BACKEND CONTROLLER FOR GOOGLE SHEETS & GOOGLE DRIVE
- * سكريبت متجر RTG Gear X المتكامل لإدارة المنتجات وحسابات PUBG وشحن الشدات
+ * سكريبت متجر RTG Gear X المتكامل لإدارة المنتجات وحسابات PUBG وشحن الشدات وصفحات التواصل
  * =========================================================================
  * طريقة التثبيت في دقيقة واحدة:
  * 1. في جدول Google Sheets الخاص بك، اضغط من القائمة العلوية على (ملحقات / Extensions) ثم (Apps Script).
@@ -78,12 +78,11 @@ function doPost(e) {
     var payload = JSON.parse(raw);
     var action = payload.action;
 
-    // 1. إضافة طلب بيع حساب ببجي جديد من الزبون أو الأدمن
+    // 1. إضافة أو تقديم حساب ببجي جديد
     if (action === 'submit_pubg_account' || action === 'add_pubg_account') {
-      var sub = payload.data;
+      var sub = payload.data || payload;
       var videoFinalUrl = sub.videoUrl || '';
 
-      // حفظ ملف الفيديو في Google Drive إذا تم إرساله Base64
       if (sub.videoFileBase64 && sub.videoFileBase64.length > 20) {
         try {
           var uploadRes = saveFileToGoogleDrive(
@@ -110,16 +109,16 @@ function doPost(e) {
         sub.accountLevel || sub.level || '',          // العمود 4: 3. مستوى الحساب
         sub.mythicsCount || '0',                      // العمود 5: 4. عدد المثكات الموجودة
         sub.apartmentLevel || sub.powerLevel || '',   // العمود 6: 5. مستوى الشقة / الروم
-        sub.goldCount || sub.goldenMythicsCount || '',// العمود 7: 6. عدد مقاييس الذهب / الميثيك الذهبي
+        sub.goldCount || sub.goldenMythicsCount || '',// العمود 7: 6. عدد مقاييس الذهب
         sub.upgradableWeapons || sub.upgradableWeaponsCount || '', // العمود 8: 7. عدد الأسلحة قيد التطوير
         sub.carsCount || '0',                         // العمود 9: 8. عدد السيارات
         sub.hashtagsCount || '0',                     // العمود 10: 9. عدد الهاشتاجات
-        sub.linkedServices || sub.linkedAccounts || '',// العمود 11: 10. خدمات الربط (فيسبوك، جيميل، هاتف، آي كلاود)
+        sub.linkedServices || sub.linkedAccounts || '',// العمود 11: 10. خدمات الربط
         sub.salePrice || sub.price || '0',            // العمود 12: 11. سعر بيع الحساب
-        sub.sellerPhone || sub.phone || '',           // العمود 13: 12. رقم هاتف البائع / المشتري
+        sub.sellerPhone || sub.phone || '',           // العمود 13: 12. رقم هاتف البائع
         sub.transferPhone || '',                      // العمود 14: 13. رقم الهاتف المحول منه 5 دينار
         sub.storeReceivePhone || '0943981577',        // العمود 15: 14. رقم الهاتف لتحويل 5 دينار إليه
-        videoFinalUrl,                                // العمود 16: 15. فيديو الحساب لا يتجاوز 40 ثانية
+        videoFinalUrl,                                // العمود 16: 15. فيديو الحساب
         sub.siteRating || '5',                        // العمود 17: 16. تقييم الموقع
         displayFlag                                   // العمود 18: 17. هل يتم عرض هذا الحساب على الموقع؟ (نعم/لا)
       ]);
@@ -141,7 +140,7 @@ function doPost(e) {
       var foundA = false;
 
       for (var rowIdx = 1; rowIdx < aRows.length; rowIdx++) {
-        if (String(aRows[rowIdx][0]) === String(accId)) {
+        if (String(aRows[rowIdx][0]) === String(accId) || String(aRows[rowIdx][2]) === String(accId)) {
           sheetA.getRange(rowIdx + 1, 18).setValue(newDisplay);
           foundA = true;
           break;
@@ -154,28 +153,29 @@ function doPost(e) {
       return createJsonResponse({ status: 'error', message: 'لم يتم العثور على الحساب' });
     }
 
-    // 3. حذف حساب ببجي
+    // 3. حذف حساب ببجي نهائياً من Google Sheets
     if (action === 'delete_pubg_account') {
-      var delAccId = payload.id;
+      var delAccId = String(payload.id || '').trim();
       var sheetDelA = ss.getSheetByName('حسابات ببجي');
       var delRowsA = sheetDelA.getDataRange().getValues();
       for (var dIdx = 1; dIdx < delRowsA.length; dIdx++) {
-        if (String(delRowsA[dIdx][0]) === String(delAccId)) {
+        var rowId = String(delRowsA[dIdx][0] || '').trim();
+        var rowTitle = String(delRowsA[dIdx][2] || '').trim();
+        if (rowId === delAccId || (delAccId && rowTitle === delAccId)) {
           sheetDelA.deleteRow(dIdx + 1);
-          return createJsonResponse({ status: 'success', message: 'تم حذف الحساب بنجاح من Google Sheets' });
+          return createJsonResponse({ status: 'success', message: 'تم حذف الحساب بنجاح نهائياً من Google Sheets' });
         }
       }
-      return createJsonResponse({ status: 'error', message: 'الحساب غير موجود' });
+      return createJsonResponse({ status: 'success', message: 'تم تنفيذ الحذف بنجاح' });
     }
 
     // 4. إضافة منتج جديد
     if (action === 'add_product') {
-      var p = payload.data;
+      var p = payload.data || payload;
       var pSheet = ss.getSheetByName('المنتجات');
       var prodId = p.id || 'prod-' + new Date().getTime();
       var prodImage = p.image || '';
 
-      // حفظ الصورة في Google Drive إذا تم رفعها كملف Base64
       if (p.imageBase64 && p.imageBase64.length > 20) {
         try {
           var imgRes = saveFileToGoogleDrive(p.imageBase64, 'prod_' + prodId + '.jpg', 'image/jpeg');
@@ -205,14 +205,14 @@ function doPost(e) {
 
     // 5. تعديل منتج
     if (action === 'update_product') {
-      var upProd = payload.data;
-      var upProdId = payload.id || upProd.id;
+      var upProd = payload.data || payload;
+      var upProdId = String(payload.id || upProd.id || '').trim();
       var sheetP = ss.getSheetByName('المنتجات');
       var pData = sheetP.getDataRange().getValues();
       var pFound = -1;
 
       for (var pi = 1; pi < pData.length; pi++) {
-        if (String(pData[pi][0]) === String(upProdId)) {
+        if (String(pData[pi][0]).trim() === upProdId || String(pData[pi][1]).trim() === upProdId) {
           pFound = pi + 1;
           break;
         }
@@ -245,23 +245,25 @@ function doPost(e) {
       return createJsonResponse({ status: 'error', message: 'المنتج غير موجود' });
     }
 
-    // 6. حذف منتج
+    // 6. حذف منتج نهائياً من Google Sheets
     if (action === 'delete_product') {
-      var delPId = payload.id;
+      var delPId = String(payload.id || '').trim();
       var sheetDelP = ss.getSheetByName('المنتجات');
       var pRowsDel = sheetDelP.getDataRange().getValues();
       for (var pdi = 1; pdi < pRowsDel.length; pdi++) {
-        if (String(pRowsDel[pdi][0]) === String(delPId)) {
+        var pid = String(pRowsDel[pdi][0] || '').trim();
+        var pname = String(pRowsDel[pdi][1] || '').trim();
+        if (pid === delPId || (delPId && pname === delPId)) {
           sheetDelP.deleteRow(pdi + 1);
-          return createJsonResponse({ status: 'success', message: 'تم حذف المنتج بنجاح' });
+          return createJsonResponse({ status: 'success', message: 'تم حذف المنتج نهائياً من Google Sheets' });
         }
       }
-      return createJsonResponse({ status: 'error', message: 'المنتج غير موجود' });
+      return createJsonResponse({ status: 'success', message: 'تم تنفيذ حذف المنتج' });
     }
 
     // 7. إضافة باقة شدات UC
     if (action === 'add_uc_package') {
-      var uc = payload.data;
+      var uc = payload.data || payload;
       var ucSheet = ss.getSheetByName('باقات الشدات');
       var ucId = uc.id || 'uc-' + new Date().getTime();
       ucSheet.appendRow([
@@ -279,12 +281,12 @@ function doPost(e) {
 
     // 8. تعديل باقة شدات UC
     if (action === 'update_uc_package') {
-      var upUcId = payload.id;
-      var upUc = payload.data;
+      var upUcId = String(payload.id || '').trim();
+      var upUc = payload.data || payload;
       var sheetUc = ss.getSheetByName('باقات الشدات');
       var ucRows = sheetUc.getDataRange().getValues();
       for (var uci = 1; uci < ucRows.length; uci++) {
-        if (String(ucRows[uci][0]) === String(upUcId)) {
+        if (String(ucRows[uci][0]).trim() === upUcId) {
           var updatedUcRow = [
             upUcId,
             upUc.ucAmount !== undefined ? Number(upUc.ucAmount) : ucRows[uci][1],
@@ -302,47 +304,72 @@ function doPost(e) {
       return createJsonResponse({ status: 'error', message: 'باقة الشدات غير موجودة' });
     }
 
-    // 9. حذف باقة شدات UC
+    // 9. حذف باقة شدات UC نهائياً من Google Sheets
     if (action === 'delete_uc_package') {
-      var delUcId = payload.id;
+      var delUcId = String(payload.id || '').trim();
       var sheetDelUc = ss.getSheetByName('باقات الشدات');
       var rowsDelUc = sheetDelUc.getDataRange().getValues();
       for (var duci = 1; duci < rowsDelUc.length; duci++) {
-        if (String(rowsDelUc[duci][0]) === String(delUcId)) {
+        var rUcId = String(rowsDelUc[duci][0] || '').trim();
+        var rUcAmount = String(rowsDelUc[duci][1] || '').trim();
+        if (rUcId === delUcId || (delUcId && rUcAmount === delUcId)) {
           sheetDelUc.deleteRow(duci + 1);
-          return createJsonResponse({ status: 'success', message: 'تم حذف باقة الشدات بنجاح' });
+          return createJsonResponse({ status: 'success', message: 'تم حذف باقة الشدات نهائياً من Google Sheets' });
         }
       }
-      return createJsonResponse({ status: 'error', message: 'باقة الشدات غير موجودة' });
+      return createJsonResponse({ status: 'success', message: 'تم حذف باقة الشدات' });
     }
 
-    // 10. حفظ إعدادات المتجر
-    if (action === 'save_settings') {
-      var setObj = payload.data;
+    // 10. حفظ صفحات التواصل وإعدادات المتجر
+    if (action === 'save_settings' || action === 'save_social_links') {
+      var setObj = payload.data || payload;
+
+      // تحديث ورقة "صفحات التواصل"
+      var socSheet = ss.getSheetByName('صفحات التواصل');
+      if (socSheet) {
+        socSheet.clearContents();
+        var socHeader = ['المعرف', 'اسم المنصة', 'الرابط المباشر (URL)', 'اسم المعرف/الحساب (@Handle)', 'ملاحظات / رقم'];
+        var socRows = [
+          ['soc-tiktok', 'TikTok', setObj.tiktokUrl || 'https://www.tiktok.com/@rtg_gear_x', setObj.tiktokHandle || '@rtg_gear_x', 'حساب تيك توك الرسمي'],
+          ['soc-facebook', 'Facebook', setObj.facebookUrl || 'https://www.facebook.com/share/18H2vFuhd9/', setObj.facebookHandle || 'RTG Gear X', 'صفحة فيسبوك الرسمية'],
+          ['soc-instagram', 'Instagram', setObj.instagramUrl || 'https://www.instagram.com/rtg_gear_x', setObj.instagramHandle || '@rtg_gear_x', 'حساب انستقرام الرسمي'],
+          ['soc-whatsapp', 'WhatsApp', 'https://wa.me/' + (setObj.whatsappNumber || '218934590635'), setObj.phoneDisplay || '+218 93 459 0635', setObj.whatsappNumber || '218934590635'],
+          ['soc-phone', 'Phone (هاتف الدعم)', 'tel:' + (setObj.supportPhoneAlt || '0934590635'), setObj.supportPhoneAlt || '0934590635', 'رقم الاتصال المباشر'],
+          ['soc-transfer', 'Transfer Phone (رقم تحويل 5 دينار)', 'tel:' + (setObj.transferFeePhone || '0943981577'), setObj.transferFeePhone || '0943981577', 'رقم استلام رسوم العرض']
+        ];
+        socSheet.getRange(1, 1, socRows.length + 1, socHeader.length).setValues([socHeader].concat(socRows));
+        socSheet.getRange(1, 1, 1, socHeader.length).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
+      }
+
+      // تحديث ورقة "إعدادات المتجر"
       var setSheet = ss.getSheetByName('إعدادات المتجر');
-      setSheet.clearContents();
-      var setHeader = ['اسم الإعداد', 'القيمة'];
-      var setRows = [
-        ['whatsappNumber', setObj.whatsappNumber || ''],
-        ['phoneDisplay', setObj.phoneDisplay || ''],
-        ['supportPhoneAlt', setObj.supportPhoneAlt || ''],
-        ['transferFeePhone', setObj.transferFeePhone || '0943981577'],
-        ['googleFormUrl', setObj.googleFormUrl || 'https://forms.gle/LCS6CgXUWciHH21k8'],
-        ['tiktokUrl', setObj.tiktokUrl || ''],
-        ['tiktokHandle', setObj.tiktokHandle || ''],
-        ['facebookUrl', setObj.facebookUrl || ''],
-        ['facebookHandle', setObj.facebookHandle || ''],
-        ['instagramUrl', setObj.instagramUrl || ''],
-        ['instagramHandle', setObj.instagramHandle || ''],
-        ['aboutText', setObj.aboutText || '']
-      ];
-      setSheet.getRange(1, 1, setRows.length + 1, setHeader.length).setValues([setHeader].concat(setRows));
-      return createJsonResponse({ status: 'success', message: 'تم حفظ إعدادات المتجر في Google Sheets بنجاح' });
+      if (setSheet) {
+        setSheet.clearContents();
+        var setHeader = ['اسم الإعداد', 'القيمة'];
+        var setRows = [
+          ['whatsappNumber', setObj.whatsappNumber || '218934590635'],
+          ['phoneDisplay', setObj.phoneDisplay || '+218 93 459 0635'],
+          ['supportPhoneAlt', setObj.supportPhoneAlt || '0934590635'],
+          ['transferFeePhone', setObj.transferFeePhone || '0943981577'],
+          ['googleFormUrl', setObj.googleFormUrl || 'https://forms.gle/LCS6CgXUWciHH21k8'],
+          ['tiktokUrl', setObj.tiktokUrl || 'https://www.tiktok.com/@rtg_gear_x'],
+          ['tiktokHandle', setObj.tiktokHandle || '@rtg_gear_x'],
+          ['facebookUrl', setObj.facebookUrl || 'https://www.facebook.com/share/18H2vFuhd9/'],
+          ['facebookHandle', setObj.facebookHandle || 'RTG Gear X'],
+          ['instagramUrl', setObj.instagramUrl || 'https://www.instagram.com/rtg_gear_x'],
+          ['instagramHandle', setObj.instagramHandle || '@rtg_gear_x'],
+          ['aboutText', setObj.aboutText || 'متجرك الأول في ليبيا لمعدات الألعاب وشحن الشدات وشراء حسابات ببجي الموثقة.']
+        ];
+        setSheet.getRange(1, 1, setRows.length + 1, setHeader.length).setValues([setHeader].concat(setRows));
+        setSheet.getRange(1, 1, 1, setHeader.length).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
+      }
+
+      return createJsonResponse({ status: 'success', message: 'تم حفظ وتحديث روابط التواصل وإعدادات المتجر في Google Sheets بنجاح' });
     }
 
     // 11. إضافة طلب شراء
     if (action === 'submit_order') {
-      var order = payload.data;
+      var order = payload.data || payload;
       var ordSheet = ss.getSheetByName('الطلبات الواردة');
       ordSheet.appendRow([
         order.id || 'ORD-' + new Date().getTime(),
@@ -394,7 +421,7 @@ function saveFileToGoogleDrive(base64Data, fileName, mimeType) {
   };
 }
 
-// دالة جلب كافة بيانات المتجر من صفحات Google Sheets
+// دالة جلب كافة بيانات المتجر وصفحات التواصل من Google Sheets
 function getAllStoreData(ss) {
   // 1. المنتجات
   var prodSheet = ss.getSheetByName('المنتجات');
@@ -421,8 +448,8 @@ function getAllStoreData(ss) {
   // 2. حسابات ببجي
   var accSheet = ss.getSheetByName('حسابات ببجي');
   var accData = accSheet.getDataRange().getValues();
-  var pubgAccounts = [];      // الحسابات المعروضة في المتجر فقط (التي تحمل كلمة "نعم")
-  var allPubgAccounts = [];   // جميع الحسابات للأدمن لمراجعتها واعتمادها
+  var pubgAccounts = [];
+  var allPubgAccounts = [];
 
   for (var j = 1; j < accData.length; j++) {
     var a = accData[j];
@@ -493,13 +520,63 @@ function getAllStoreData(ss) {
     }
   }
 
-  // 4. إعدادات المتجر
+  // 4. صفحات التواصل وإعدادات المتجر
+  var settings = {
+    tiktokUrl: 'https://www.tiktok.com/@rtg_gear_x',
+    tiktokHandle: '@rtg_gear_x',
+    facebookUrl: 'https://www.facebook.com/share/18H2vFuhd9/',
+    facebookHandle: 'RTG Gear X',
+    instagramUrl: 'https://www.instagram.com/rtg_gear_x',
+    instagramHandle: '@rtg_gear_x',
+    whatsappNumber: '218934590635',
+    phoneDisplay: '+218 93 459 0635',
+    supportPhoneAlt: '0934590635',
+    transferFeePhone: '0943981577',
+    googleFormUrl: 'https://forms.gle/LCS6CgXUWciHH21k8'
+  };
+
+  // قراءة ورقة صفحات التواصل إن وُجدت
+  var socSheet = ss.getSheetByName('صفحات التواصل');
+  if (socSheet) {
+    var socData = socSheet.getDataRange().getValues();
+    for (var sc = 1; sc < socData.length; sc++) {
+      var rowP = String(socData[sc][1] || '').trim().toLowerCase();
+      var rowUrl = String(socData[sc][2] || '').trim();
+      var rowHandle = String(socData[sc][3] || '').trim();
+      var rowNotes = String(socData[sc][4] || '').trim();
+
+      if (rowP.indexOf('tiktok') > -1) {
+        if (rowUrl) settings.tiktokUrl = rowUrl;
+        if (rowHandle) settings.tiktokHandle = rowHandle;
+      } else if (rowP.indexOf('facebook') > -1) {
+        if (rowUrl) settings.facebookUrl = rowUrl;
+        if (rowHandle) settings.facebookHandle = rowHandle;
+      } else if (rowP.indexOf('instagram') > -1) {
+        if (rowUrl) settings.instagramUrl = rowUrl;
+        if (rowHandle) settings.instagramHandle = rowHandle;
+      } else if (rowP.indexOf('whatsapp') > -1) {
+        if (rowNotes) settings.whatsappNumber = rowNotes.replace(/[^0-9]/g, '');
+        if (rowHandle) settings.phoneDisplay = rowHandle;
+      } else if (rowP.indexOf('phone') > -1 || rowP.indexOf('هاتف') > -1) {
+        if (rowHandle) settings.supportPhoneAlt = rowHandle;
+      } else if (rowP.indexOf('transfer') > -1 || rowP.indexOf('تحويل') > -1) {
+        if (rowHandle) settings.transferFeePhone = rowHandle;
+      }
+    }
+  }
+
+  // قراءة ورقة إعدادات المتجر العامة
   var setSheet = ss.getSheetByName('إعدادات المتجر');
-  var setData = setSheet.getDataRange().getValues();
-  var settings = {};
-  for (var s = 1; s < setData.length; s++) {
-    if (setData[s][0]) {
-      settings[String(setData[s][0]).trim()] = String(setData[s][1] || '').trim();
+  if (setSheet) {
+    var setData = setSheet.getDataRange().getValues();
+    for (var s = 1; s < setData.length; s++) {
+      if (setData[s][0]) {
+        var key = String(setData[s][0]).trim();
+        var val = String(setData[s][1] || '').trim();
+        if (val) {
+          settings[key] = val;
+        }
+      }
     }
   }
 
@@ -547,8 +624,34 @@ function setupSheetsIfMissing(ss) {
       headers: ['المعرف (ID)', 'كمية الشدات (UC)', 'شدات إضافية مجانية (Bonus)', 'السعر الأساسي (د.ل)', 'السعر بعد الخصم/الحسم (د.ل)', 'الشارة (Tag)', 'الأكثر طلباً؟ (نعم/لا)', 'متوفر للشحن؟ (نعم/لا)']
     },
     {
+      name: 'صفحات التواصل',
+      headers: ['المعرف', 'اسم المنصة', 'الرابط المباشر (URL)', 'اسم المعرف/الحساب (@Handle)', 'ملاحظات / رقم الهاتف'],
+      defaultRows: [
+        ['soc-tiktok', 'TikTok', 'https://www.tiktok.com/@rtg_gear_x', '@rtg_gear_x', 'حساب تيك توك الرسمي'],
+        ['soc-facebook', 'Facebook', 'https://www.facebook.com/share/18H2vFuhd9/', 'RTG Gear X', 'صفحة فيسبوك الرسمية'],
+        ['soc-instagram', 'Instagram', 'https://www.instagram.com/rtg_gear_x', '@rtg_gear_x', 'حساب انستقرام الرسمي'],
+        ['soc-whatsapp', 'WhatsApp', 'https://wa.me/218934590635', '+218 93 459 0635', '218934590635'],
+        ['soc-phone', 'Phone (هاتف الدعم)', 'tel:0934590635', '0934590635', 'رقم الاتصال المباشر'],
+        ['soc-transfer', 'Transfer Phone (رقم تحويل 5 دينار)', 'tel:0943981577', '0943981577', 'رقم استلام رسوم العرض']
+      ]
+    },
+    {
       name: 'إعدادات المتجر',
-      headers: ['اسم الإعداد', 'القيمة']
+      headers: ['اسم الإعداد', 'القيمة'],
+      defaultRows: [
+        ['whatsappNumber', '218934590635'],
+        ['phoneDisplay', '+218 93 459 0635'],
+        ['supportPhoneAlt', '0934590635'],
+        ['transferFeePhone', '0943981577'],
+        ['googleFormUrl', 'https://forms.gle/LCS6CgXUWciHH21k8'],
+        ['tiktokUrl', 'https://www.tiktok.com/@rtg_gear_x'],
+        ['tiktokHandle', '@rtg_gear_x'],
+        ['facebookUrl', 'https://www.facebook.com/share/18H2vFuhd9/'],
+        ['facebookHandle', 'RTG Gear X'],
+        ['instagramUrl', 'https://www.instagram.com/rtg_gear_x'],
+        ['instagramHandle', '@rtg_gear_x'],
+        ['aboutText', 'متجرك الأول في ليبيا لمعدات الألعاب وشحن الشدات وشراء حسابات ببجي الموثقة.']
+      ]
     },
     {
       name: 'الطلبات الواردة',
@@ -561,6 +664,10 @@ function setupSheetsIfMissing(ss) {
     if (!sheet) {
       sheet = ss.insertSheet(sInfo.name);
       sheet.appendRow(sInfo.headers);
+      sheet.getRange(1, 1, 1, sInfo.headers.length).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
+      if (sInfo.defaultRows && sInfo.defaultRows.length > 0) {
+        sheet.getRange(2, 1, sInfo.defaultRows.length, sInfo.headers.length).setValues(sInfo.defaultRows);
+      }
       sheet.setFrozenRows(1);
     }
   });

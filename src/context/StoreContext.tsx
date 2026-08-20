@@ -206,8 +206,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [isAppsScriptSyncing, setIsAppsScriptSyncing] = useState(false);
 
+  // Fetch live store data from backend API (/api/store) and optionally Google Apps Script
+  const fetchServerData = async () => {
+    try {
+      const res = await fetch('/api/store');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.status === 'success') {
+          if (Array.isArray(data.products) && data.products.length > 0) {
+            setProducts(data.products);
+          }
+          if (Array.isArray(data.pubgAccounts) && data.pubgAccounts.length > 0) {
+            setPubgAccounts(data.pubgAccounts);
+          }
+          if (Array.isArray(data.allPubgAccounts) && data.allPubgAccounts.length > 0) {
+            setAllPubgAccounts(data.allPubgAccounts);
+          }
+          if (Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
+            setUcPackages(data.ucPackages);
+          }
+          if (data.settings && typeof data.settings === 'object') {
+            setSettings((prev) => ({ ...prev, ...data.settings }));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Local API fetch error:', err);
+    }
+  };
+
   // Fetch live store data from Google Apps Script Web App
   const refreshFromAppsScript = async () => {
+    // Always fetch unified server data first
+    await fetchServerData();
+
     const config = AppsScriptService.getConfig();
     if (!config.webAppUrl) return;
 
@@ -235,6 +267,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.settings && typeof data.settings === 'object') {
         setSettings((prev) => ({ ...prev, ...data.settings }));
       }
+
+      // Sync fetched Apps Script data to backend server
+      fetch('/api/store/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          products: data.products,
+          pubgAccounts: data.pubgAccounts,
+          allPubgAccounts: data.allPubgAccounts || data.pubgAccounts,
+          ucPackages: data.ucPackages,
+          settings: data.settings,
+          pubgSubmissions: data.pubgSubmissions,
+        }),
+      }).catch(() => {});
     } catch (e) {
       console.warn('Could not auto-fetch from Google Apps Script:', e);
     } finally {
@@ -242,15 +288,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Auto-fetch on mount, interval polling (every 40s), and window/tab focus
+  // Auto-fetch on mount, interval polling (every 30s), and window/tab focus
   useEffect(() => {
     // Immediate initial sync
+    fetchServerData();
     refreshFromAppsScript();
 
     // Periodic sync so all visitors and devices stay updated in real time
     const interval = setInterval(() => {
       refreshFromAppsScript();
-    }, 40000);
+    }, 30000);
 
     // Refresh when user returns to tab or focuses the window
     const handleVisibilityChange = () => {
@@ -636,6 +683,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
     setProducts((prev) => [newProduct, ...prev]);
 
+    // Save to local server
+    fetch('/api/store/product', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newProduct),
+    }).catch(() => {});
+
     // Send to Google Sheets Apps Script
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
@@ -648,6 +702,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
     );
 
+    // Sync state to server
+    setTimeout(() => {
+      fetch('/api/store/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products: products.map(p => p.id === id ? { ...p, ...updated } : p) }),
+      }).catch(() => {});
+    }, 100);
+
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
       AppsScriptService.updateProduct(appsScriptConfig.webAppUrl, id, updated).catch(console.error);
@@ -656,6 +719,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteProduct = (id: string) => {
     setProducts((prev) => prev.filter((item) => item.id !== id));
+
+    // Delete on server
+    fetch(`/api/store/product/${id}`, { method: 'DELETE' }).catch(() => {});
 
     // Delete from Google Sheets Apps Script
     const appsScriptConfig = AppsScriptService.getConfig();
@@ -673,6 +739,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       status: 'approved',
     };
     setPubgAccounts((prev) => [newAccount, ...prev]);
+
+    // Save to server
+    fetch('/api/store/pubg-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newAccount),
+    }).catch(() => {});
 
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
@@ -752,6 +825,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAllPubgAccounts((prev) => prev.filter((item) => item.id !== id));
     setPubgSubmissions((prev) => prev.filter((s) => s.id !== id));
 
+    // Delete on server
+    fetch(`/api/store/pubg-account/${id}`, { method: 'DELETE' }).catch(() => {});
+
     // Delete from Google Sheets Apps Script
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
@@ -766,6 +842,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: `uc-${Date.now()}`,
     };
     setUcPackages((prev) => [...prev, newPkg]);
+
+    // Save on server
+    fetch('/api/store/uc-package', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newPkg),
+    }).catch(() => {});
 
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
@@ -787,6 +870,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const deleteUcPackage = (id: string) => {
     setUcPackages((prev) => prev.filter((item) => item.id !== id));
 
+    // Delete on server
+    fetch(`/api/store/uc-package/${id}`, { method: 'DELETE' }).catch(() => {});
+
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
       AppsScriptService.deleteUcPackage(appsScriptConfig.webAppUrl, id).catch(console.error);
@@ -795,7 +881,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Admin Settings
   const updateSettings = (newSettings: Partial<StoreSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    setSettings((prev) => {
+      const merged = { ...prev, ...newSettings };
+
+      // Update on server
+      fetch('/api/store/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings),
+      }).catch(() => {});
+
+      const appsScriptConfig = AppsScriptService.getConfig();
+      if (appsScriptConfig.webAppUrl) {
+        AppsScriptService.saveSettings(appsScriptConfig.webAppUrl, merged).catch(console.error);
+      }
+      return merged;
+    });
   };
 
   const updateOrderStatus = (orderId: string, status: Order['status']) => {

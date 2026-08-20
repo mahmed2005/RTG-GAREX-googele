@@ -24,10 +24,19 @@ import {
   LogOut,
   Upload,
   Image as ImageIcon,
-  ShieldCheck
+  ShieldCheck,
+  Share2,
+  Globe,
+  AlertTriangle
 } from 'lucide-react';
 
-type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'sheets_sync';
+type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'social_contact' | 'sheets_sync';
+
+interface DeleteItemState {
+  type: 'product' | 'pubg_account' | 'pubg_uc';
+  id: string;
+  name: string;
+}
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -43,6 +52,7 @@ export const AdminDashboard: React.FC = () => {
     addUcPackage,
     deleteUcPackage,
     settings,
+    updateSettings,
     setCurrentPage,
     refreshFromAppsScript,
     isAppsScriptSyncing,
@@ -50,6 +60,10 @@ export const AdminDashboard: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<AdminTab>('products');
   const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Deletion Confirmation Modal State
+  const [itemToDelete, setItemToDelete] = useState<DeleteItemState | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Apps Script Sync State
   const [appsScriptConfig, setAppsScriptConfig] = useState<AppsScriptConfig>(AppsScriptService.getConfig());
@@ -98,6 +112,22 @@ export const AdminDashboard: React.FC = () => {
     isPopular: false,
   });
 
+  // Social & Contact Links Form State
+  const [socialForm, setSocialForm] = useState({
+    tiktokUrl: settings.tiktokUrl || 'https://www.tiktok.com/@rtg_gear_x',
+    tiktokHandle: settings.tiktokHandle || '@rtg_gear_x',
+    facebookUrl: settings.facebookUrl || 'https://www.facebook.com/share/18H2vFuhd9/',
+    facebookHandle: settings.facebookHandle || 'RTG Gear X',
+    instagramUrl: settings.instagramUrl || 'https://www.instagram.com/rtg_gear_x',
+    instagramHandle: settings.instagramHandle || '@rtg_gear_x',
+    whatsappNumber: settings.whatsappNumber || '218934590635',
+    phoneDisplay: settings.phoneDisplay || '+218 93 459 0635',
+    supportPhoneAlt: settings.supportPhoneAlt || '0934590635',
+    transferFeePhone: settings.transferFeePhone || '0943981577',
+    googleFormUrl: settings.googleFormUrl || 'https://forms.gle/LCS6CgXUWciHH21k8',
+  });
+  const [isSavingSocial, setIsSavingSocial] = useState(false);
+
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMsg({ type, text });
     setTimeout(() => setToastMsg(null), 5000);
@@ -106,6 +136,50 @@ export const AdminDashboard: React.FC = () => {
   const handleLogout = () => {
     sessionStorage.removeItem('rtg_admin_authenticated');
     setCurrentPage('home');
+  };
+
+  // Perform Item Deletion
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+    setIsDeleting(true);
+    try {
+      if (itemToDelete.type === 'product') {
+        deleteProduct(itemToDelete.id);
+        showToast('success', `تم حذف المنتج "${itemToDelete.name}" نهائياً من الموقع وجدول Google Sheets`);
+      } else if (itemToDelete.type === 'pubg_account') {
+        deletePubgAccount(itemToDelete.id);
+        showToast('success', `تم حذف حساب PUBG "${itemToDelete.name}" نهائياً من الموقع وجدول Google Sheets`);
+      } else if (itemToDelete.type === 'pubg_uc') {
+        deleteUcPackage(itemToDelete.id);
+        showToast('success', `تم حذف باقة الشدات "${itemToDelete.name}" نهائياً من الموقع وجدول Google Sheets`);
+      }
+      setItemToDelete(null);
+    } catch (err: any) {
+      showToast('error', 'حدث خطأ أثناء الحذف: ' + (err.message || 'حاول مجدداً'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Handle Save Social & Contact Links
+  const handleSaveSocialLinks = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSocial(true);
+    try {
+      updateSettings(socialForm);
+
+      const cfg = AppsScriptService.getConfig();
+      if (cfg.webAppUrl) {
+        await AppsScriptService.saveSettings(cfg.webAppUrl, socialForm);
+        showToast('success', 'تم حفظ وتحديث روابط تيك توك وفيسبوك وانستقرام وأرقام الهواتف في Google Sheets والموقع بنجاح!');
+      } else {
+        showToast('success', 'تم تحديث روابط التواصل في الموقع بنجاح! (قم بربط Google Apps Script لحفظها في الشيت تلقائياً)');
+      }
+    } catch (err: any) {
+      showToast('error', 'تعذر حفظ الروابط: ' + (err.message || 'خطأ في الاتصال'));
+    } finally {
+      setIsSavingSocial(false);
+    }
   };
 
   // 1. Handle Add Product
@@ -336,54 +410,66 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* 4 Main Tabs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 mb-8">
+        {/* 5 Main Tabs */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-8">
           <button
             onClick={() => setActiveTab('products')}
-            className={`p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all border ${
+            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
               activeTab === 'products'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <ShoppingBag className="w-4 h-4" />
+            <ShoppingBag className="w-4 h-4 flex-shrink-0" />
             <span>المنتجات ({products.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('pubg_accounts')}
-            className={`p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all border ${
+            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
               activeTab === 'pubg_accounts'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Gamepad2 className="w-4 h-4" />
+            <Gamepad2 className="w-4 h-4 flex-shrink-0" />
             <span>حسابات ببجي ({displayedPubgAccounts.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('pubg_uc')}
-            className={`p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all border ${
+            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
               activeTab === 'pubg_uc'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Zap className="w-4 h-4" />
+            <Zap className="w-4 h-4 flex-shrink-0" />
             <span>باقات الشدات ({ucPackages.length})</span>
           </button>
 
           <button
+            onClick={() => setActiveTab('social_contact')}
+            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+              activeTab === 'social_contact'
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
+                : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
+            }`}
+          >
+            <Share2 className="w-4 h-4 flex-shrink-0" />
+            <span>صفحات التواصل</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('sheets_sync')}
-            className={`p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2.5 transition-all border ${
+            className={`col-span-2 sm:col-span-1 p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
               activeTab === 'sheets_sync'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Link2 className="w-4 h-4" />
-            <span>الربط وجلب البيانات</span>
+            <Link2 className="w-4 h-4 flex-shrink-0" />
+            <span>كود Apps Script</span>
           </button>
         </div>
 
@@ -558,12 +644,7 @@ export const AdminDashboard: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={() => {
-                        if (confirm(`هل أنت متأكد من حذف المنتج "${prod.name}"؟`)) {
-                          deleteProduct(prod.id);
-                          showToast('success', 'تم حذف المنتج بنجاح');
-                        }
-                      }}
+                      onClick={() => setItemToDelete({ type: 'product', id: prod.id, name: prod.name })}
                       className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
                       title="حذف المنتج"
                     >
@@ -907,14 +988,9 @@ export const AdminDashboard: React.FC = () => {
                           </button>
 
                           <button
-                            onClick={() => {
-                              if (confirm(`هل أنت متأكد من حذف الحساب "${acc.accountName || acc.title}"؟`)) {
-                                deletePubgAccount(acc.id);
-                                showToast('success', 'تم حذف الحساب بنجاح');
-                              }
-                            }}
+                            onClick={() => setItemToDelete({ type: 'pubg_account', id: acc.id, name: acc.accountName || acc.title || 'حساب ببجي' })}
                             className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
-                            title="حذف الحساب"
+                            title="حذف الحساب نهائياً"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1049,12 +1125,7 @@ export const AdminDashboard: React.FC = () => {
                   <div className="flex items-center justify-between pt-3 border-t border-white/5">
                     <span className="text-base font-black text-white font-mono">{pkg.price} د.ل</span>
                     <button
-                      onClick={() => {
-                        if (confirm(`حذف باقة ${pkg.ucAmount} UC؟`)) {
-                          deleteUcPackage(pkg.id);
-                          showToast('success', 'تم حذف الباقة بنجاح');
-                        }
-                      }}
+                      onClick={() => setItemToDelete({ type: 'pubg_uc', id: pkg.id, name: `${pkg.ucAmount} UC` })}
                       className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
                       title="حذف الباقة"
                     >
@@ -1067,7 +1138,247 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: GOOGLE SHEETS APPS SCRIPT SYNC */}
+        {/* TAB 4: SOCIAL MEDIA & CONTACT LINKS */}
+        {activeTab === 'social_contact' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 shadow-xl space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <Share2 className="w-5 h-5 text-red-500" />
+                    <span>صفحات التواصل الاجتماعي وأرقام الهواتف</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    قم بتحديث روابط صفحات تيك توك، فيسبوك، انستقرام وأرقام الهواتف ليتم حفظها في Google Sheet وتحديثها في جميع أزرار الموقع وصفحة "اتصل بنا" تلقائياً.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
+                  <Globe className="w-4 h-4" />
+                  <span>تحديث مباشر لجميع الأجهزة</span>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveSocialLinks} className="space-y-6">
+                {/* Social Networks Group */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
+                    <span>1. روابط صفحات السوشيال ميديا الرسمية (TikTok - Facebook - Instagram)</span>
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* TikTok */}
+                    <div className="bg-[#151824] border border-white/5 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-black border border-white/40 inline-block"></span>
+                          صفحة تيك توك (TikTok)
+                        </span>
+                        {socialForm.tiktokUrl && (
+                          <a href={socialForm.tiktokUrl} target="_blank" rel="noreferrer" className="text-[11px] text-red-400 hover:underline flex items-center gap-1">
+                            <span>زيارة</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">رابط الحساب المباشر (URL)</label>
+                        <input
+                          type="url"
+                          dir="ltr"
+                          value={socialForm.tiktokUrl}
+                          onChange={(e) => setSocialForm({ ...socialForm, tiktokUrl: e.target.value })}
+                          placeholder="https://www.tiktok.com/@rtg_gear_x"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">اسم المعرف الظاهر (@Handle)</label>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          value={socialForm.tiktokHandle}
+                          onChange={(e) => setSocialForm({ ...socialForm, tiktokHandle: e.target.value })}
+                          placeholder="@rtg_gear_x"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Facebook */}
+                    <div className="bg-[#151824] border border-white/5 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
+                          صفحة فيسبوك (Facebook)
+                        </span>
+                        {socialForm.facebookUrl && (
+                          <a href={socialForm.facebookUrl} target="_blank" rel="noreferrer" className="text-[11px] text-blue-400 hover:underline flex items-center gap-1">
+                            <span>زيارة</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">رابط الصفحة المباشر (URL)</label>
+                        <input
+                          type="url"
+                          dir="ltr"
+                          value={socialForm.facebookUrl}
+                          onChange={(e) => setSocialForm({ ...socialForm, facebookUrl: e.target.value })}
+                          placeholder="https://www.facebook.com/share/..."
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">اسم الصفحة الظاهر</label>
+                        <input
+                          type="text"
+                          value={socialForm.facebookHandle}
+                          onChange={(e) => setSocialForm({ ...socialForm, facebookHandle: e.target.value })}
+                          placeholder="RTG Gear X"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Instagram */}
+                    <div className="bg-[#151824] border border-white/5 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-pink-600 inline-block"></span>
+                          حساب انستقرام (Instagram)
+                        </span>
+                        {socialForm.instagramUrl && (
+                          <a href={socialForm.instagramUrl} target="_blank" rel="noreferrer" className="text-[11px] text-pink-400 hover:underline flex items-center gap-1">
+                            <span>زيارة</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">رابط الحساب المباشر (URL)</label>
+                        <input
+                          type="url"
+                          dir="ltr"
+                          value={socialForm.instagramUrl}
+                          onChange={(e) => setSocialForm({ ...socialForm, instagramUrl: e.target.value })}
+                          placeholder="https://www.instagram.com/rtg_gear_x"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">اسم المعرف الظاهر (@Handle)</label>
+                        <input
+                          type="text"
+                          dir="ltr"
+                          value={socialForm.instagramHandle}
+                          onChange={(e) => setSocialForm({ ...socialForm, instagramHandle: e.target.value })}
+                          placeholder="@rtg_gear_x"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Google Form Link */}
+                    <div className="bg-[#151824] border border-white/5 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block"></span>
+                          نموذج بيع الحسابات (Google Form)
+                        </span>
+                        {socialForm.googleFormUrl && (
+                          <a href={socialForm.googleFormUrl} target="_blank" rel="noreferrer" className="text-[11px] text-purple-400 hover:underline flex items-center gap-1">
+                            <span>معاينة</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">رابط نموذج Google Form المباشر</label>
+                        <input
+                          type="url"
+                          dir="ltr"
+                          value={socialForm.googleFormUrl}
+                          onChange={(e) => setSocialForm({ ...socialForm, googleFormUrl: e.target.value })}
+                          placeholder="https://forms.gle/..."
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Phone Numbers Group */}
+                <div className="space-y-4 pt-4 border-t border-white/10">
+                  <h3 className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
+                    <span>2. أرقام الهواتف والدعم والتحويل</span>
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">رقم الواتساب (بدون +)</label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={socialForm.whatsappNumber}
+                        onChange={(e) => setSocialForm({ ...socialForm, whatsappNumber: e.target.value })}
+                        placeholder="218934590635"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">رقم الاتصال المباشر (للاتصال)</label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={socialForm.supportPhoneAlt}
+                        onChange={(e) => setSocialForm({ ...socialForm, supportPhoneAlt: e.target.value })}
+                        placeholder="0934590635"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1.5">رقم استقبال تحويل 5 دينار لعرض الحساب</label>
+                      <input
+                        type="text"
+                        dir="ltr"
+                        value={socialForm.transferFeePhone}
+                        onChange={(e) => setSocialForm({ ...socialForm, transferFeePhone: e.target.value })}
+                        placeholder="0943981577"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t border-white/10">
+                  <button
+                    type="submit"
+                    disabled={isSavingSocial}
+                    className="px-8 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-lg shadow-red-950/60 transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isSavingSocial ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>جارٍ الحفظ في Google Sheets...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>حفظ وتحديث صفحات التواصل في Google Sheets والموقع</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: GOOGLE SHEETS APPS SCRIPT SYNC */}
         {activeTab === 'sheets_sync' && (
           <div className="space-y-6">
             <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 shadow-xl space-y-6">
@@ -1129,7 +1440,7 @@ export const AdminDashboard: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-300">
-                    كود Apps Script الكامل والمعدل لجدول بياناتك:
+                    كود Apps Script الكامل والمعدل لجدول بياناتك (شامل الحذف وصفحات التواصل):
                   </label>
                   <button
                     onClick={handleCopyCode}
@@ -1149,6 +1460,85 @@ export const AdminDashboard: React.FC = () => {
                     className="w-full p-4 rounded-2xl bg-[#090a0f] border border-white/10 text-slate-300 font-mono text-[11px] leading-relaxed focus:outline-none resize-none select-all"
                   />
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL: ITEM DELETION CONFIRMATION DIALOG                  */}
+        {/* ========================================================= */}
+        {itemToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-[#12141e] border border-red-500/40 rounded-3xl p-6 max-w-md w-full shadow-2xl shadow-red-950/50 space-y-5 text-right font-['Cairo',sans-serif]">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 flex-shrink-0">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-black text-white">
+                    تأكيد حذف نهائي
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-1">
+                    هل أنت متأكد من رغبتك في حذف هذا العنصر؟
+                  </p>
+                </div>
+                <button
+                  onClick={() => setItemToDelete(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Target Details Card */}
+              <div className="bg-[#0e1017] border border-white/10 rounded-2xl p-4 space-y-2 text-xs">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>نوع العنصر:</span>
+                  <span className="text-red-400 font-bold">
+                    {itemToDelete.type === 'product' && '📦 منتج متجر'}
+                    {itemToDelete.type === 'pubg_account' && '🎮 حساب PUBG Mobile'}
+                    {itemToDelete.type === 'pubg_uc' && '⚡ باقة شدات UC'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>الاسم / الوصف:</span>
+                  <strong className="text-white truncate max-w-[200px]">{itemToDelete.name}</strong>
+                </div>
+                <div className="pt-2 border-t border-white/5 text-[11px] text-amber-400 flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>سيتم إزالته فوراً من الموقع وحذفه نهائياً من جدول Google Sheets.</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setItemToDelete(null)}
+                  disabled={isDeleting}
+                  className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition-colors"
+                >
+                  إلغاء التراجع
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 active:scale-95 text-white text-xs font-bold shadow-lg shadow-red-950/60 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isDeleting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>جارٍ الحذف...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>نعم، حذف نهائي</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
