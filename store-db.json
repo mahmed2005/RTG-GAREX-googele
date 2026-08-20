@@ -1,57 +1,13 @@
 {
   "products": [
     {
-      "id": "prod-cam-1",
-      "name": "كاميرا مراقبة ذكية Smart WiFi Security Cam بدقة 4K",
-      "category": "كاميرات مراقبة",
-      "price": 165,
-      "oldPrice": 195,
-      "image": "https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=800&q=80",
-      "description": "كاميرا مراقبة لاسلكية أمنية ذكية تدعم الاتصال بالواي فاي، كشف الحركة، التحدث ثنائي الاتجاه، ورؤية ليلية بالألوان وتسجيل سحابي وبطاقة ذاكرة.",
-      "inStock": true,
-      "featured": true
-    },
-    {
-      "id": "prod-cam-2",
-      "name": "كاميرا مراقبة خارجية Outdoor Security Cam مضادة للماء",
-      "category": "كاميرات مراقبة",
-      "price": 210,
-      "oldPrice": 245,
-      "image": "https://images.unsplash.com/photo-1580828343064-fde4fc206bc6?auto=format&fit=crop&w=800&q=80",
-      "description": "كاميرا أمنية خارجية للمنازل والمحلات مقاومة للعوامل الجوية مع كشاف إنذار ليلي ومستشعر حركة فائق الحساسية مع إشعارات مباشرة على الهاتف.",
-      "inStock": true,
-      "featured": true
-    },
-    {
-      "id": "prod-3",
-      "name": "Black Shark Magnetic Cooler",
-      "category": "مبردات",
-      "price": 185,
-      "oldPrice": 220,
-      "image": "https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?auto=format&fit=crop&w=800&q=80",
-      "description": "مبردات هواتف ألعاب فائقة القوة بتبريد مغناطيسي سريع يدعم أجهزة الآيفون والأندرويد.",
-      "inStock": true,
-      "featured": true
-    },
-    {
-      "id": "prod-4",
-      "name": "Razer BlackWidow V3",
-      "category": "كيبورد",
-      "price": 778,
-      "oldPrice": 890,
-      "image": "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80",
-      "description": "كيبورد ميكانيكي احترافي بمفاتيح خضراء سريعة وإضاءة RGB مذهلة.",
-      "inStock": true,
-      "featured": true
-    },
-    {
       "id": "prod-5",
       "name": "Logitech G502 Hero",
       "category": "ماوس",
       "price": 348,
       "oldPrice": 420,
       "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80",
-      "description": "ماوس الألعاب الأسطوري مع مستشعر Hero 25K عالي الدقة وأوزان قابلة للتعديل.",
+      "description": "ماوس",
       "inStock": true,
       "featured": true
     },
@@ -62,7 +18,7 @@
       "price": 520,
       "oldPrice": 600,
       "image": "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80",
-      "description": "ميكروفون احترافي للبثوص والتسجيل الصوتي عالي النقاء بدون تشويش.",
+      "description": "ميكروفونات",
       "inStock": true,
       "featured": true
     },
@@ -73,18 +29,7 @@
       "price": 115,
       "oldPrice": 140,
       "image": "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80",
-      "description": "مروحة تبريد عالية الكفاءة لحماية الهاتف من السخونة أثناء الألعاب الثقيلة.",
-      "inStock": true,
-      "featured": true
-    },
-    {
-      "id": "prod-9",
-      "name": "NVIDIA RTX 3060 12GB",
-      "category": "كروت شاشة",
-      "price": 1850,
-      "oldPrice": 2100,
-      "image": "https://images.unsplash.com/photo-1587202372775-e229f172b9d7?auto=format&fit=crop&w=800&q=80",
-      "description": "كرت شاشة قوي للألعاب والمونتاج بذاكرة 12 جيجابايت لتشغيل كافة الألعاب بسلاسة.",
+      "description": "مبردات",
       "inStock": true,
       "featured": true
     }
@@ -119,8 +64,7 @@
       "isAvailable": true,
       "features": [
         "57 ميثيك",
-        "63 سلاح مطور",
-        "22 سيارة مميزة",
+        "63",
         "تسليم آمن ومضمون"
       ]
     }
@@ -155,8 +99,106 @@
       "isAvailable": true,
       "features": [
         "57 ميثيك",
-        "63 سلاح مطور",
-        "22 سيارة مميزة",
+        "63",
+        "تسليم آمن ومضمون"
+      ]
+    },
+    {
+      "id": "46088.612490671294",
+      "ownerName": "يوسف",
+      "accountName": "YOUSEF",
+      "title": "YOUSEF",
+      "badge": "حساب موثق",
+      "level": "LVL 88",
+      "accountLevel": "88",
+      "mythicsCount": "34",
+      "apartmentLevel": "44",
+      "goldCount": "32",
+      "upgradableWeaponsCount": "77",
+      "carsCount": "11",
+      "hashtagsCount": "5",
+      "linkedServices": "اي كلاود",
+      "linkedAccounts": "اي كلاود",
+      "price": 350,
+      "salePrice": "350",
+      "sellerPhone": "0935945888",
+      "transferPhone": "09284987565",
+      "storeReceivePhone": "https://drive.google.com/open?id=1or8YhizRINCy32kdTfJMI0bC4wZPrvoJ",
+      "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
+      "videoUrl": "",
+      "siteRating": "5",
+      "displayOnSite": "لا",
+      "approved": false,
+      "isAvailable": true,
+      "features": [
+        "34 ميثيك",
+        "77",
+        "تسليم آمن ومضمون"
+      ]
+    },
+    {
+      "id": "46207.653465509255",
+      "ownerName": "محمد",
+      "accountName": "RTG ",
+      "title": "RTG ",
+      "badge": "حساب موثق",
+      "level": "LVL 67",
+      "accountLevel": "67",
+      "mythicsCount": "‏7",
+      "apartmentLevel": "‏67",
+      "goldCount": "‏7",
+      "upgradableWeaponsCount": "‏8",
+      "carsCount": "‏11",
+      "hashtagsCount": "‏5",
+      "linkedServices": "فيسبوك",
+      "linkedAccounts": "فيسبوك",
+      "price": 0,
+      "salePrice": "‏5000",
+      "sellerPhone": "‏0926382555",
+      "transferPhone": "‏0937554499",
+      "storeReceivePhone": "https://drive.google.com/open?id=19V1Unmy_ps8idDbJzVkjiVeV4I0Tp3GY",
+      "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
+      "videoUrl": "5",
+      "siteRating": "5",
+      "displayOnSite": "لا",
+      "approved": false,
+      "isAvailable": true,
+      "features": [
+        "‏7 ميثيك",
+        "‏8",
+        "تسليم آمن ومضمون"
+      ]
+    },
+    {
+      "id": "46207.653465509255",
+      "ownerName": "محمد",
+      "accountName": "RTG ",
+      "title": "RTG ",
+      "badge": "حساب موثق",
+      "level": "LVL 67",
+      "accountLevel": "67",
+      "mythicsCount": "‏7",
+      "apartmentLevel": "‏67",
+      "goldCount": "‏7",
+      "upgradableWeaponsCount": "‏8",
+      "carsCount": "‏11",
+      "hashtagsCount": "‏5",
+      "linkedServices": "فيسبوك",
+      "linkedAccounts": "فيسبوك",
+      "price": 0,
+      "salePrice": "‏5000",
+      "sellerPhone": "‏0926382555",
+      "transferPhone": "‏0937554499",
+      "storeReceivePhone": "https://drive.google.com/open?id=19V1Unmy_ps8idDbJzVkjiVeV4I0Tp3GY",
+      "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
+      "videoUrl": "5",
+      "siteRating": "5",
+      "displayOnSite": "لا",
+      "approved": false,
+      "isAvailable": true,
+      "features": [
+        "‏7 ميثيك",
+        "‏8",
         "تسليم آمن ومضمون"
       ]
     }
@@ -169,8 +211,7 @@
       "bonusUc": 60,
       "price": 35,
       "isPopular": true,
-      "isAvailable": true,
-      "tag": "شحن فوري بالـ ID"
+      "isAvailable": true
     }
   ],
   "settings": {
@@ -190,11 +231,11 @@
     "facebookHandle": "RTG GEARx",
     "instagramUrl": "https://instagram.com/rtg_gearx",
     "instagramHandle": "rtg_gearx@",
-    "aboutText": "هو متجر متخصص في كل ما يخص عالم الألعاب (الجيمينج) وصناعة المحتوى وكاميرات المراقبة الذكية. انطلقنا من شغفنا بالألعاب لنقدم للاعبين في ليبيا والوطن العربي أفضل المعدات بأفضل الأسعار.",
+    "aboutText": "هو متجر متخصص في كل ما يخص عالم الألعاب (الجيمينج) وصناعة المحتوى. انطلقنا من شغفنا بالألعاب لنقدم للاعبين في ليبيا والوطن العربي أفضل المعدات بأفضل الأسعار. نحن لسنا مجرد متجر نحن مجتمع للاعبين، نختار منتجاتنا بعناية فائقة لضمان حصولك على أداء متميز يرفع من مستواك في اللعب وتمنحك أفضل تجربة ممكنة.",
     "shippingText": "توصيل متوفر لجميع المحافظات والمدن الليبية عبر شركات الشحن المعتمدة.",
     "hoursText": "متواجدون على مدار الساعة عبر الواتساب لتلبية طلباتكم.",
     "currency": "د.ل"
   },
   "orders": [],
-  "lastUpdated": "2026-08-20T23:08:11.950Z"
+  "lastUpdated": "2026-08-20T23:49:10.295Z"
 }

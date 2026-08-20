@@ -679,8 +679,8 @@ function createJsonResponse(data) {
 }
 `;
 
-export const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxqUFaY0IWsIkYPkzMsEuN9pbEmbBz2jhus8D5hKwg5/exec';
-export const DEFAULT_DEV_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxqUFaY0IWsIkYPkzMsEuN9pbEmbBz2jhus8D5hKwg5/dev';
+export const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxO0mCyl7uJx1EhxtWUBfR86pSRGKL-oVByHfKBA3TSfKhKZt-D8nWKTSMS_1poz7VsA/exec';
+export const DEFAULT_DEV_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxO0mCyl7uJx1EhxtWUBfR86pSRGKL-oVByHfKBA3TSfKhKZt-D8nWKTSMS_1poz7VsA/exec';
 
 export class AppsScriptService {
   public static getConfig(): AppsScriptConfig {
