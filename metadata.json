@@ -1,0 +1,6 @@
+{
+  "name": "RTG GEAR X - Gaming Store Libya",
+  "description": "متجر RTG GEAR X لمعدات الألعاب الاحترافية، حسابات ببجي موبايل، وشحن الشدات المباشر في ليبيا مع لوحة تحكم متكاملة للإدارة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: #0b0c10;
+    overflow-x: hidden;
+  }
+
+  * {
+    border-color: rgba(255, 255, 255, 0.08);
+    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+  
+  /* Custom sleek scrollbar */
+  ::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #090a0e;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1f2330;
+    border-radius: 9999px;
+    border: 2px solid #090a0e;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #e11d48;
+  }
+}
+
+/* Luxury Glow and Effects */
+.glow-red {
+  box-shadow: 0 0 30px -4px rgba(239, 68, 68, 0.45);
+}
+
+.glow-red-sm {
+  box-shadow: 0 0 14px -2px rgba(239, 68, 68, 0.35);
+}
+
+.glow-gold {
+  box-shadow: 0 0 24px -3px rgba(245, 158, 11, 0.4);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 24px -3px rgba(16, 185, 129, 0.4);
+}
+
+.bg-radial-gradient {
+  background: radial-gradient(circle at 50% 0%, rgba(239, 68, 68, 0.16) 0%, rgba(11, 12, 16, 0) 70%);
+}
+
+.bg-glass {
+  background: rgba(16, 18, 26, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Smooth Page Transitions */
+.page-fade-in {
+  animation: pageFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
