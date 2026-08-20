@@ -543,72 +543,82 @@ export const AdminDashboard: React.FC = () => {
             )}
 
             {/* Products Table */}
-            <div className="bg-[#12141e] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-right text-xs">
-                  <thead className="bg-[#171926] text-slate-400 font-bold border-b border-white/10">
-                    <tr>
-                      <th className="py-4 px-4">الصورة</th>
-                      <th className="py-4 px-4">اسم المنتج</th>
-                      <th className="py-4 px-4">الفئة</th>
-                      <th className="py-4 px-4">السعر</th>
-                      <th className="py-4 px-4">الحالة</th>
-                      <th className="py-4 px-4 text-left">الإجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {products.map((prod) => (
-                      <tr key={prod.id} className="hover:bg-white/5 transition-colors">
-                        <td className="py-3 px-4">
-                          <img
-                            src={prod.image}
-                            alt={prod.name}
-                            className="w-12 h-12 rounded-xl object-cover border border-white/10 bg-black/40"
-                          />
-                        </td>
-                        <td className="py-3 px-4 font-bold text-white">{prod.name}</td>
-                        <td className="py-3 px-4">
-                          <span className="px-2.5 py-1 bg-red-600/15 text-red-400 rounded-lg font-semibold">
-                            {prod.category}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-mono font-bold text-white">
-                          {prod.price} د.ل
-                        </td>
-                        <td className="py-3 px-4">
-                          {prod.inStock ? (
-                            <span className="text-emerald-400 font-bold">متوفر</span>
-                          ) : (
-                            <span className="text-red-400 font-bold">نفذ</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-left">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => startEditProduct(prod)}
-                              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
-                              title="تعديل"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                deleteProduct(prod.id);
-                                showToast(`تم حذف ${prod.name} بنجاح`);
-                              }}
-                              className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
-                              title="حذف"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {products.length === 0 ? (
+              <div className="text-center py-16 bg-[#12141e] border border-white/10 rounded-3xl p-8">
+                <Gamepad2 className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+                <h3 className="text-base font-bold text-white mb-1">لا توجد أي منتجات مضافة</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  المتجر فارغ وجاهز. يمكنك البدء بإضافة أول منتج للبيع عبر زر "إضافة منتج جديد" أعلاه وسيُحفظ تلقائياً في Google Sheets.
+                </p>
               </div>
-            </div>
+            ) : (
+              <div className="bg-[#12141e] border border-white/10 rounded-3xl overflow-hidden shadow-xl">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-[#171926] text-slate-400 font-bold border-b border-white/10">
+                      <tr>
+                        <th className="py-4 px-4">الصورة</th>
+                        <th className="py-4 px-4">اسم المنتج</th>
+                        <th className="py-4 px-4">الفئة</th>
+                        <th className="py-4 px-4">السعر</th>
+                        <th className="py-4 px-4">الحالة</th>
+                        <th className="py-4 px-4 text-left">الإجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {products.map((prod) => (
+                        <tr key={prod.id} className="hover:bg-white/5 transition-colors">
+                          <td className="py-3 px-4">
+                            <img
+                              src={prod.image}
+                              alt={prod.name}
+                              className="w-12 h-12 rounded-xl object-cover border border-white/10 bg-black/40"
+                            />
+                          </td>
+                          <td className="py-3 px-4 font-bold text-white">{prod.name}</td>
+                          <td className="py-3 px-4">
+                            <span className="px-2.5 py-1 bg-red-600/15 text-red-400 rounded-lg font-semibold">
+                              {prod.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-mono font-bold text-white">
+                            {prod.price} د.ل
+                          </td>
+                          <td className="py-3 px-4">
+                            {prod.inStock ? (
+                              <span className="text-emerald-400 font-bold">متوفر</span>
+                            ) : (
+                              <span className="text-red-400 font-bold">نفذ</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-left">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => startEditProduct(prod)}
+                                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
+                                title="تعديل"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  deleteProduct(prod.id);
+                                  showToast(`تم حذف ${prod.name} بنجاح`);
+                                }}
+                                className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                                title="حذف"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -878,54 +888,64 @@ export const AdminDashboard: React.FC = () => {
             )}
 
             {/* Accounts List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pubgAccounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  className="p-5 rounded-3xl bg-[#12141e] border border-white/10 flex items-center justify-between gap-4"
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <img
-                      src={acc.image}
-                      alt={acc.title}
-                      className="w-16 h-16 rounded-2xl object-cover border border-white/10 flex-shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 rounded-md bg-red-600/20 text-red-400 text-[10px] font-bold">
-                          {acc.badge}
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono">{acc.level}</span>
+            {pubgAccounts.length === 0 ? (
+              <div className="text-center py-16 bg-[#12141e] border border-white/10 rounded-3xl p-8">
+                <Sparkles className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+                <h3 className="text-base font-bold text-white mb-1">لا توجد أي حسابات معروضة حالياً</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  يمكنك إضافة حساب يدوياً أو اعتماد طلبات بيع الحسابات الواردة من تبويب "طلبات بيع الحسابات".
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pubgAccounts.map((acc) => (
+                  <div
+                    key={acc.id}
+                    className="p-5 rounded-3xl bg-[#12141e] border border-white/10 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-4 min-w-0">
+                      <img
+                        src={acc.image}
+                        alt={acc.title}
+                        className="w-16 h-16 rounded-2xl object-cover border border-white/10 flex-shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 rounded-md bg-red-600/20 text-red-400 text-[10px] font-bold">
+                            {acc.badge}
+                          </span>
+                          <span className="text-xs text-slate-400 font-mono">{acc.level}</span>
+                        </div>
+                        <h4 className="text-sm font-bold text-white truncate">{acc.title}</h4>
+                        <p className="text-xs text-red-400 font-mono font-bold mt-1">
+                          {acc.price.toLocaleString()} د.ل
+                        </p>
                       </div>
-                      <h4 className="text-sm font-bold text-white truncate">{acc.title}</h4>
-                      <p className="text-xs text-red-400 font-mono font-bold mt-1">
-                        {acc.price.toLocaleString()} د.ل
-                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => startEditAccount(acc)}
+                        className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
+                        title="تعديل"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          deletePubgAccount(acc.id);
+                          showToast(`تم حذف الحساب ${acc.title} بنجاح`);
+                        }}
+                        className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                        title="حذف"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => startEditAccount(acc)}
-                      className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white"
-                      title="تعديل"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        deletePubgAccount(acc.id);
-                        showToast(`تم حذف الحساب ${acc.title} بنجاح`);
-                      }}
-                      className="p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
-                      title="حذف"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1263,46 +1283,58 @@ export const AdminDashboard: React.FC = () => {
             )}
 
             {/* UC Cards List */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {ucPackages.map((pkg) => (
-                <div
-                  key={pkg.id}
-                  className="p-5 rounded-3xl bg-[#12141e] border border-white/10 flex items-center justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-black text-white font-mono">{pkg.ucAmount} UC</span>
-                      {pkg.bonusUc > 0 && (
-                        <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded">
-                          +{pkg.bonusUc}
-                        </span>
-                      )}
+            {ucPackages.length === 0 ? (
+              <div className="text-center py-16 bg-[#12141e] border border-white/10 rounded-3xl p-8">
+                <Zap className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+                <h3 className="text-base font-bold text-white mb-1">لا توجد باقات شدات مضافة حالياً</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  اضغط على زر "إضافة باقة جديدة" لإدخال كميات الـ UC، البونص المجاني، والسعر، وستُحفظ مباشرة في Google Sheets.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {ucPackages.map((pkg) => (
+                  <div
+                    key={pkg.id}
+                    className="p-5 rounded-3xl bg-[#12141e] border border-white/10 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-black text-white font-mono">{pkg.ucAmount} UC</span>
+                        {pkg.bonusUc > 0 && (
+                          <span className="text-[10px] text-emerald-400 font-mono font-bold bg-emerald-500/20 px-1.5 py-0.5 rounded">
+                            +{pkg.bonusUc}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-sm font-black text-amber-400 font-mono mt-1 block">
+                        {pkg.price} د.ل
+                      </span>
                     </div>
-                    <span className="text-sm font-black text-amber-400 font-mono mt-1 block">
-                      {pkg.price} د.ل
-                    </span>
-                  </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => startEditUc(pkg)}
-                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        deleteUcPackage(pkg.id);
-                        showToast(`تم حذف باقة ${pkg.ucAmount} UC بنجاح`);
-                      }}
-                      className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => startEditUc(pkg)}
+                        className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300"
+                        title="تعديل"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          deleteUcPackage(pkg.id);
+                          showToast(`تم حذف باقة ${pkg.ucAmount} UC بنجاح`);
+                        }}
+                        className="p-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400"
+                        title="حذف"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

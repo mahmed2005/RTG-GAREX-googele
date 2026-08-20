@@ -32,6 +32,8 @@ export interface PubgAccount {
   videoUrl?: string;
   isAvailable: boolean;
   viewsCount?: number;
+  approved?: boolean; // هل تمت الموافقة عليه (نعم في الشيت)
+  status?: 'pending' | 'approved' | 'rejected';
   // Detailed specifications
   powerLevel?: string;
   mythicsCount?: string;
@@ -42,6 +44,9 @@ export interface PubgAccount {
   linkedAccounts?: string;
   sellerName?: string;
   sellerPhone?: string;
+  transferPhone?: string;
+  videoFileBase64?: string;
+  videoFileName?: string;
 }
 
 export interface PubgSellSubmission {
@@ -59,7 +64,10 @@ export interface PubgSellSubmission {
   salePrice: string;
   phone: string;
   transferPhone: string; // الرقم الذي تم إرسال 5 ليرات منه
-  videoUrl: string; // رابط فيديو الحساب (أقل من 40 ثانية)
+  videoUrl: string; // رابط فيديو الحساب
+  videoFileBase64?: string; // ملف الفيديو الأصلي مرفوع مباشرة
+  videoFileName?: string;
+  videoMimeType?: string;
   date: string;
   status: 'pending' | 'approved' | 'rejected';
 }

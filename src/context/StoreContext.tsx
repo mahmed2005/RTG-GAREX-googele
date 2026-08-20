@@ -106,13 +106,13 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  PRODUCTS: 'rtg_products_v1',
-  PUBG_ACCOUNTS: 'rtg_pubg_accounts_v1',
-  UC_PACKAGES: 'rtg_uc_packages_v1',
-  SETTINGS: 'rtg_settings_v1',
-  ORDERS: 'rtg_orders_v1',
-  CART: 'rtg_cart_v1',
-  PUBG_SUBMISSIONS: 'rtg_pubg_submissions_v1',
+  PRODUCTS: 'rtg_products_v2_clean',
+  PUBG_ACCOUNTS: 'rtg_pubg_accounts_v2_clean',
+  UC_PACKAGES: 'rtg_uc_packages_v2',
+  SETTINGS: 'rtg_settings_v2',
+  ORDERS: 'rtg_orders_v2',
+  CART: 'rtg_cart_v2',
+  PUBG_SUBMISSIONS: 'rtg_pubg_submissions_v2',
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -520,7 +520,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (submission.linkedAccounts) feats.push(submission.linkedAccounts);
 
     const newAccount: PubgAccount = {
-      id: `acc-${Date.now()}`,
+      id: submission.id || `acc-${Date.now()}`,
       title: submission.accountName || `حساب PUBG لفل ${submission.accountLevel}`,
       badge: 'حساب موثق',
       level: `LVL ${submission.accountLevel}`,
@@ -530,6 +530,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
       videoUrl: submission.videoUrl || '',
       isAvailable: true,
+      approved: true,
+      status: 'approved',
       powerLevel: submission.powerLevel,
       mythicsCount: submission.mythicsCount,
       goldenMythicsCount: submission.goldenMythicsCount,
@@ -541,10 +543,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sellerPhone: submission.phone,
     };
 
-    setPubgAccounts((prev) => [newAccount, ...prev]);
+    setPubgAccounts((prev) => {
+      const exists = prev.some((a) => a.id === newAccount.id);
+      if (exists) {
+        return prev.map((a) => (a.id === newAccount.id ? newAccount : a));
+      }
+      return [newAccount, ...prev];
+    });
+
     setPubgSubmissions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, status: 'approved' } : s))
     );
+
+    // Call Apps Script to set 'نعم' and publish in Google Sheets
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.approvePubgSubmission(appsScriptConfig.webAppUrl, id).catch(console.error);
+    }
   };
 
   // Reject PUBG Submission
@@ -552,11 +567,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setPubgSubmissions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, status: 'rejected' } : s))
     );
+    setPubgAccounts((prev) => prev.filter((a) => a.id !== id));
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.rejectPubgSubmission(appsScriptConfig.webAppUrl, id).catch(console.error);
+    }
   };
 
   // Delete PUBG Submission
   const deletePubgSubmission = (id: string) => {
     setPubgSubmissions((prev) => prev.filter((s) => s.id !== id));
+    setPubgAccounts((prev) => prev.filter((a) => a.id !== id));
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.deletePubgAccount(appsScriptConfig.webAppUrl, id).catch(console.error);
+    }
   };
 
   // Admin CRUD for Products
@@ -566,16 +593,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: `prod-${Date.now()}`,
     };
     setProducts((prev) => [newProduct, ...prev]);
+
+    // Send to Google Sheets Apps Script
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.addProduct(appsScriptConfig.webAppUrl, newProduct).catch(console.error);
+    }
   };
 
   const updateProduct = (id: string, updated: Partial<Product>) => {
     setProducts((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
     );
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.updateProduct(appsScriptConfig.webAppUrl, id, updated).catch(console.error);
+    }
   };
 
   const deleteProduct = (id: string) => {
     setProducts((prev) => prev.filter((item) => item.id !== id));
+
+    // Delete from Google Sheets Apps Script
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.deleteProduct(appsScriptConfig.webAppUrl, id).catch(console.error);
+    }
   };
 
   // Admin CRUD for PUBG Accounts
@@ -583,18 +627,40 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const newAccount: PubgAccount = {
       ...account,
       id: `acc-${Date.now()}`,
+      approved: true,
+      status: 'approved',
     };
     setPubgAccounts((prev) => [newAccount, ...prev]);
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.syncAllData(appsScriptConfig.webAppUrl, {
+        products,
+        pubgAccounts: [newAccount, ...pubgAccounts],
+      }).catch(console.error);
+    }
   };
 
   const updatePubgAccount = (id: string, updated: Partial<PubgAccount>) => {
     setPubgAccounts((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
     );
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.updatePubgAccount(appsScriptConfig.webAppUrl, id, updated).catch(console.error);
+    }
   };
 
   const deletePubgAccount = (id: string) => {
     setPubgAccounts((prev) => prev.filter((item) => item.id !== id));
+    setPubgSubmissions((prev) => prev.filter((s) => s.id !== id));
+
+    // Delete from Google Sheets Apps Script
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.deletePubgAccount(appsScriptConfig.webAppUrl, id).catch(console.error);
+    }
   };
 
   // Admin CRUD for UC Packages
@@ -604,16 +670,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: `uc-${Date.now()}`,
     };
     setUcPackages((prev) => [...prev, newPkg]);
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.addUcPackage(appsScriptConfig.webAppUrl, newPkg).catch(console.error);
+    }
   };
 
   const updateUcPackage = (id: string, updated: Partial<UcPackage>) => {
     setUcPackages((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
     );
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.updateUcPackage(appsScriptConfig.webAppUrl, id, updated).catch(console.error);
+    }
   };
 
   const deleteUcPackage = (id: string) => {
     setUcPackages((prev) => prev.filter((item) => item.id !== id));
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.deleteUcPackage(appsScriptConfig.webAppUrl, id).catch(console.error);
+    }
   };
 
   // Admin Settings
