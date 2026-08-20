@@ -35,15 +35,37 @@ function doGet(e) {
     setupSheetsIfMissing(ss);
 
     var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : 'get_all';
+    var callback = (e && e.parameter && e.parameter.callback) ? e.parameter.callback : null;
 
     if (action === 'get_all' || action === 'ping') {
       var data = getAllStoreData(ss);
-      return createJsonResponse({ status: 'success', data: data });
+      var responseObj = { status: 'success', data: data };
+      var jsonStr = JSON.stringify(responseObj);
+
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + jsonStr + ')')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+
+      return ContentService.createTextOutput(jsonStr)
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
-    return createJsonResponse({ status: 'error', message: 'إجراء غير معروف' });
+    var notFoundObj = { status: 'error', message: 'إجراء غير معروف' };
+    if (callback) {
+      return ContentService.createTextOutput(callback + '(' + JSON.stringify(notFoundObj) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(JSON.stringify(notFoundObj))
+      .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    return createJsonResponse({ status: 'error', message: err.toString() });
+    var errObj = { status: 'error', message: err.toString() };
+    if (e && e.parameter && e.parameter.callback) {
+      return ContentService.createTextOutput(e.parameter.callback + '(' + JSON.stringify(errObj) + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(JSON.stringify(errObj))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -626,6 +648,62 @@ export class AppsScriptService {
   }
 
   /**
+   * Universal JSONP requester that completely bypasses CORS restrictions
+   */
+  private static loadViaJsonp(baseUrl: string, timeoutMs: number = 7000): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (typeof window === 'undefined') {
+        return reject(new Error('Window is undefined'));
+      }
+
+      const callbackName = 'rtg_gas_cb_' + Math.random().toString(36).substring(2, 10);
+      let isDone = false;
+
+      const timer = setTimeout(() => {
+        if (!isDone) {
+          isDone = true;
+          cleanup();
+          reject(new Error('JSONP timeout'));
+        }
+      }, timeoutMs);
+
+      const cleanup = () => {
+        clearTimeout(timer);
+        try {
+          delete (window as any)[callbackName];
+        } catch {}
+        const scriptEl = document.getElementById(callbackName);
+        if (scriptEl && scriptEl.parentNode) {
+          scriptEl.parentNode.removeChild(scriptEl);
+        }
+      };
+
+      (window as any)[callbackName] = (data: any) => {
+        if (!isDone) {
+          isDone = true;
+          cleanup();
+          resolve(data);
+        }
+      };
+
+      const script = document.createElement('script');
+      script.id = callbackName;
+      const sep = baseUrl.includes('?') ? '&' : '?';
+      script.src = `${baseUrl}${sep}action=get_all&callback=${callbackName}&_t=${Date.now()}`;
+      script.async = true;
+      script.onerror = () => {
+        if (!isDone) {
+          isDone = true;
+          cleanup();
+          reject(new Error('JSONP load error'));
+        }
+      };
+
+      document.head.appendChild(script);
+    });
+  }
+
+  /**
    * Fetch all store items live from Google Apps Script Web App
    */
   public static async fetchStoreData(webAppUrl?: string): Promise<{
@@ -651,6 +729,7 @@ export class AppsScriptService {
     let lastError: any = null;
 
     for (const testUrl of urlsToTry) {
+      // 1. Try standard GET fetch
       try {
         const fullUrl = testUrl.includes('?') ? `${testUrl}&action=get_all` : `${testUrl}?action=get_all`;
         const res = await fetch(fullUrl, {
@@ -658,13 +737,33 @@ export class AppsScriptService {
           headers: { 'Accept': 'application/json' },
         });
 
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
+        if (res.ok) {
+          const result = await res.json();
+          const data = result.data || result;
+
+          if (result.status === 'success' || data.products || data.pubgAccounts || data.ucPackages) {
+            this.saveConfig({ 
+              webAppUrl: testUrl,
+              lastSyncedAt: new Date().toLocaleString('ar-LY') 
+            });
+
+            return {
+              products: Array.isArray(data.products) ? data.products : [],
+              pubgAccounts: Array.isArray(data.pubgAccounts) ? data.pubgAccounts : [],
+              allPubgAccounts: Array.isArray(data.allPubgAccounts) ? data.allPubgAccounts : data.pubgAccounts,
+              pubgSubmissions: Array.isArray(data.pubgSubmissions) ? data.pubgSubmissions : [],
+              ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
+              settings: data.settings || {},
+            };
+          }
         }
+      } catch (err: any) {
+        lastError = err;
+      }
 
-        const result = await res.json();
-
-        // Support both result.data and direct fields in response
+      // 2. Try JSONP fallback (bypasses all browser CORS and origin blocks across all devices)
+      try {
+        const result = await this.loadViaJsonp(testUrl);
         const data = result.data || result;
 
         if (result.status === 'success' || data.products || data.pubgAccounts || data.ucPackages) {
@@ -682,8 +781,8 @@ export class AppsScriptService {
             settings: data.settings || {},
           };
         }
-      } catch (err: any) {
-        lastError = err;
+      } catch (jsonpErr: any) {
+        lastError = jsonpErr;
       }
     }
 

@@ -242,12 +242,31 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Auto-fetch on mount if configured
+  // Auto-fetch on mount, interval polling (every 40s), and window/tab focus
   useEffect(() => {
-    const config = AppsScriptService.getConfig();
-    if (config.webAppUrl && config.autoFetchOnLoad) {
+    // Immediate initial sync
+    refreshFromAppsScript();
+
+    // Periodic sync so all visitors and devices stay updated in real time
+    const interval = setInterval(() => {
       refreshFromAppsScript();
-    }
+    }, 40000);
+
+    // Refresh when user returns to tab or focuses the window
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshFromAppsScript();
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
   }, []);
 
   // Sync to local storage
