@@ -108,13 +108,13 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  PRODUCTS: 'rtg_products_v2_clean',
-  PUBG_ACCOUNTS: 'rtg_pubg_accounts_v2_clean',
-  UC_PACKAGES: 'rtg_uc_packages_v2',
-  SETTINGS: 'rtg_settings_v2',
-  ORDERS: 'rtg_orders_v2',
-  CART: 'rtg_cart_v2',
-  PUBG_SUBMISSIONS: 'rtg_pubg_submissions_v2',
+  PRODUCTS: 'rtg_products_v4_unified',
+  PUBG_ACCOUNTS: 'rtg_pubg_accounts_v4_unified',
+  UC_PACKAGES: 'rtg_uc_packages_v4_unified',
+  SETTINGS: 'rtg_settings_v4_unified',
+  ORDERS: 'rtg_orders_v4_unified',
+  CART: 'rtg_cart_v4_unified',
+  PUBG_SUBMISSIONS: 'rtg_pubg_submissions_v4_unified',
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
