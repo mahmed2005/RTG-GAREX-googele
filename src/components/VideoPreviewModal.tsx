@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { getEmbeddableVideoUrl } from './PubgVideoPlayer';
 import { soundEngine } from '../utils/soundEngine';
-import { X, Play, ExternalLink, RotateCw, Maximize2, Sparkles, Smartphone } from 'lucide-react';
+import { X, Play, ExternalLink, RotateCw, Sparkles, Smartphone, ShieldCheck, Download } from 'lucide-react';
 
 export const VideoPreviewModal: React.FC = () => {
   const { previewVideoUrl, setPreviewVideoUrl } = useStore();
   const [isRotatedLandscape, setIsRotatedLandscape] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   if (!previewVideoUrl) return null;
 
-  const { type, embedUrl, rawUrl } = getEmbeddableVideoUrl(previewVideoUrl);
+  const { type, embedUrl, rawUrl, fileId, directDownloadUrl } = getEmbeddableVideoUrl(previewVideoUrl);
 
   const handleClose = () => {
     soundEngine.playButtonClick();
@@ -38,8 +39,15 @@ export const VideoPreviewModal: React.FC = () => {
     }
   };
 
+  const handleOpenDirect = () => {
+    soundEngine.playButtonClick();
+    if (rawUrl) {
+      window.open(rawUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-2 sm:p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
       {/* Backdrop */}
       <div
         id="video-modal-backdrop"
@@ -54,7 +62,7 @@ export const VideoPreviewModal: React.FC = () => {
           isRotatedLandscape
             ? 'max-w-6xl h-[92vh] flex flex-col'
             : 'max-w-4xl'
-        } bg-[#0e101a] border border-white/15 rounded-3xl shadow-2xl p-3 sm:p-5 text-right z-10 overflow-hidden transition-all duration-300`}
+        } bg-[#0c0e17] border border-white/15 rounded-3xl shadow-2xl p-3 sm:p-5 text-right z-10 overflow-hidden transition-all duration-300`}
       >
         {/* Header Controls Bar */}
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10 flex-wrap gap-2">
@@ -63,11 +71,11 @@ export const VideoPreviewModal: React.FC = () => {
             <button
               id="close-video-modal-btn"
               onClick={handleClose}
-              className="p-2 rounded-xl bg-white/10 hover:bg-red-600 text-white transition-colors flex items-center gap-1 text-xs font-bold"
+              className="p-2 rounded-xl bg-white/10 hover:bg-red-600 text-white transition-colors flex items-center gap-1.5 text-xs font-bold"
               aria-label="إغلاق"
             >
               <X className="w-4 h-4" />
-              <span className="hidden sm:inline">إغلاق</span>
+              <span>إغلاق</span>
             </button>
 
             {/* Mobile / Desktop Landscape Toggle */}
@@ -79,36 +87,32 @@ export const VideoPreviewModal: React.FC = () => {
                   ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-950/60'
                   : 'bg-white/5 border-white/10 hover:bg-white/15 text-slate-200'
               }`}
-              title="تدوير الشاشة بالكامل للوضع الأفقي"
+              title="تدوير الشاشة أفقياً"
             >
               <RotateCw className="w-4 h-4 text-amber-400" />
               <span>{isRotatedLandscape ? 'الوضع العادي' : 'تدوير أفقي 90°'}</span>
             </button>
 
+            {/* Instant Google Drive App / Browser Opener */}
             {rawUrl && (
-              <a
-                href={rawUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-slate-300 hover:text-white transition-colors text-xs flex items-center gap-1.5 font-medium"
-                title="فتح الرابط المباشر في نافذة مستقلة"
+              <button
+                type="button"
+                onClick={handleOpenDirect}
+                className="p-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 text-blue-300 hover:text-white transition-colors text-xs flex items-center gap-1.5 font-bold"
+                title="فتح في Google Drive أو تطبيق الفيديو"
               >
-                <ExternalLink className="w-3.5 h-3.5 text-red-400" />
-                <span className="hidden sm:inline">فتح الرابط المباشر</span>
-              </a>
+                <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                <span>فتح بجودة أصلية</span>
+              </button>
             )}
           </div>
 
           {/* Title and Badge */}
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full bg-red-600/20 border border-red-500/30 text-red-400 text-xs font-bold flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              <span>أعلى دقة 1080p</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-red-400" />
+              <span>فيديو معتمد ومفحوص</span>
             </span>
-            <div className="flex items-center gap-1.5">
-              <Play className="w-4 h-4 text-red-500 fill-red-500" />
-              <h4 className="text-sm font-bold text-white">استعراض تفاصيل الحساب</h4>
-            </div>
           </div>
         </div>
 
@@ -121,32 +125,43 @@ export const VideoPreviewModal: React.FC = () => {
           {type === 'drive' || type === 'youtube' ? (
             <iframe
               src={embedUrl}
-              title="Account Video Preview"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              title="استعراض حساب ببجي"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
               allowFullScreen
               className="w-full h-full border-0 object-contain"
+              onLoad={() => setIframeLoaded(true)}
             />
           ) : (
             <video
               src={embedUrl}
               controls
-              autoPlay
               playsInline
+              autoPlay
               className="w-full h-full object-contain"
             />
           )}
         </div>
 
-        {/* Bottom Hint */}
-        <div className="pt-2.5 flex items-center justify-between text-[11px] text-slate-400">
-          <span className="flex items-center gap-1">
-            <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-            <span>يمكنك تدوير هاتفك بالعرض لمشاهدة جميع أسلحة وسكنات الحساب بحجم الشاشة الكامل</span>
-          </span>
-          <span className="font-mono text-slate-500 text-[10px]">RTG GEAR X AUTHENTIC</span>
+        {/* Bottom Hint & Fast Action Bar */}
+        <div className="pt-3 flex items-center justify-between text-[11px] text-slate-400 flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 text-slate-300">
+            <Smartphone className="w-4 h-4 text-amber-400" />
+            <span>نصيحة: يمكنك تدوير الهاتف أو الضغط على "تدوير أفقي 90°" لمشاهدة جميع أسلحة وسكنات الحساب بملء الشاشة</span>
+          </div>
+
+          {rawUrl && (
+            <a
+              href={rawUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1 underline underline-offset-4"
+            >
+              <span>إذا واجهتك مشكلة في المشغل، اضغط هنا للمشاهدة المباشرة</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
         </div>
       </div>
     </div>
   );
 };
-

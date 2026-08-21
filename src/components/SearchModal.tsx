@@ -292,7 +292,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
                         <p className="text-[11px] text-slate-400 truncate mt-0.5">
                           {acc.mythicsCount ? `${acc.mythicsCount} ميثيك` : ''} 
                           {acc.upgradableWeaponsCount ? ` • ${acc.upgradableWeaponsCount} سلاح مطور` : ''}
-                          {acc.ownerName ? ` • المالك: ${acc.ownerName}` : ''}
+                          {acc.carsCount ? ` • ${acc.carsCount} سيارات` : ''}
                         </p>
                       </div>
                     </div>

@@ -137,11 +137,11 @@ export const PubgAccountsPage: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                           <h3 className="text-lg sm:text-xl font-black text-white tracking-wide">
-                            {acc.title}
+                            {acc.title || acc.accountName || 'حساب PUBG مميز'}
                           </h3>
                         </div>
-                        <span className="text-[11px] font-bold text-slate-400 bg-white/5 px-2.5 py-1 rounded-xl border border-white/5">
-                          {acc.ownerName || 'متجر RTG'}
+                        <span className="text-[11px] font-bold text-red-400 bg-red-950/40 px-2.5 py-1 rounded-xl border border-red-500/20">
+                          {acc.badge || 'موثق'}
                         </span>
                       </div>
 
