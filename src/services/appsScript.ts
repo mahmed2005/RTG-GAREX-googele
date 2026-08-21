@@ -457,6 +457,19 @@ function getAllStoreData(ss) {
       var displayFlag = String(a[17] || 'لا').trim();
       var isApproved = (displayFlag === 'نعم' || displayFlag.toLowerCase() === 'yes');
       
+      // Find video URL flexibly if column shifted or received in alternative column
+      var foundVideo = '';
+      for (var colIdx = 13; colIdx < a.length; colIdx++) {
+        var cellVal = String(a[colIdx] || '').trim();
+        if (cellVal.indexOf('http') > -1 && (cellVal.indexOf('drive.google.com') > -1 || cellVal.indexOf('youtu') > -1 || cellVal.indexOf('.mp4') > -1)) {
+          foundVideo = cellVal;
+          break;
+        }
+      }
+      if (!foundVideo) {
+        foundVideo = String(a[15] || '').trim();
+      }
+
       var accItem = {
         id: String(a[0]),
         ownerName: String(a[1] || ''),
@@ -480,7 +493,7 @@ function getAllStoreData(ss) {
         transferPhone: String(a[13] || ''),
         storeReceivePhone: String(a[14] || '0943981577'),
         image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
-        videoUrl: String(a[15] || ''),
+        videoUrl: foundVideo,
         siteRating: String(a[16] || '5'),
         displayOnSite: isApproved ? 'نعم' : 'لا',
         approved: isApproved,

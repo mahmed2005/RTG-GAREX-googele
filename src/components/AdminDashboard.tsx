@@ -56,6 +56,7 @@ export const AdminDashboard: React.FC = () => {
     setCurrentPage,
     refreshFromAppsScript,
     isAppsScriptSyncing,
+    setPreviewVideoUrl,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('products');
@@ -945,15 +946,14 @@ export const AdminDashboard: React.FC = () => {
                           )}
 
                           {acc.videoUrl && (
-                            <a
-                              href={acc.videoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-blue-400 hover:underline flex items-center gap-1 bg-blue-500/10 px-2.5 py-1 rounded-xl"
+                            <button
+                              type="button"
+                              onClick={() => setPreviewVideoUrl(acc.videoUrl!)}
+                              className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 px-2.5 py-1 rounded-xl transition-colors font-bold"
                             >
-                              <span>فيديو الاستعراض</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>مشاهدة فيديو الحساب</span>
+                            </button>
                           )}
                         </div>
                       </div>

@@ -192,7 +192,7 @@ export const ContactPage: React.FC = () => {
                 rel="noreferrer"
                 className="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/30 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition-colors self-end sm:self-auto"
               >
-                <span>نموذج بيع الحساب Google Form</span>
+                <span>نموذج عرض الحساب للبيع</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}

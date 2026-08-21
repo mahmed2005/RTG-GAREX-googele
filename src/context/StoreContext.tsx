@@ -243,6 +243,25 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const config = AppsScriptService.getConfig();
     if (!config.webAppUrl) return;
 
+    // Helper to normalize PUBG accounts and ensure videoUrl is detected from any field (including storeReceivePhone if entered as Drive link)
+    const normalizeAccounts = (accounts: PubgAccount[]): PubgAccount[] => {
+      return accounts.map((acc) => {
+        let finalVideo = acc.videoUrl || '';
+        // If videoUrl is empty or not a link, check if storeReceivePhone or transferPhone has a video link
+        if (!finalVideo || !finalVideo.startsWith('http')) {
+          if (acc.storeReceivePhone && (acc.storeReceivePhone.includes('drive.google.com') || acc.storeReceivePhone.includes('youtu') || acc.storeReceivePhone.includes('.mp4'))) {
+            finalVideo = acc.storeReceivePhone;
+          } else if (acc.transferPhone && (acc.transferPhone.includes('drive.google.com') || acc.transferPhone.includes('youtu') || acc.transferPhone.includes('.mp4'))) {
+            finalVideo = acc.transferPhone;
+          }
+        }
+        return {
+          ...acc,
+          videoUrl: finalVideo,
+        };
+      });
+    };
+
     try {
       setIsAppsScriptSyncing(true);
       const data = await AppsScriptService.fetchStoreData(config.webAppUrl);
@@ -251,12 +270,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setProducts(data.products);
       }
       if (data.pubgAccounts && Array.isArray(data.pubgAccounts)) {
-        setPubgAccounts(data.pubgAccounts);
+        const normAccounts = normalizeAccounts(data.pubgAccounts);
+        setPubgAccounts(normAccounts);
       }
       if (data.allPubgAccounts && Array.isArray(data.allPubgAccounts) && data.allPubgAccounts.length > 0) {
-        setAllPubgAccounts(data.allPubgAccounts);
+        const normAll = normalizeAccounts(data.allPubgAccounts);
+        setAllPubgAccounts(normAll);
       } else if (data.pubgAccounts && Array.isArray(data.pubgAccounts)) {
-        setAllPubgAccounts(data.pubgAccounts);
+        const normAccounts = normalizeAccounts(data.pubgAccounts);
+        setAllPubgAccounts(normAccounts);
       }
       if (data.pubgSubmissions && Array.isArray(data.pubgSubmissions)) {
         setPubgSubmissions(data.pubgSubmissions);
@@ -269,13 +291,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // Sync fetched Apps Script data to backend server
+      const normalizedAccountsForSync = data.pubgAccounts ? normalizeAccounts(data.pubgAccounts) : [];
+      const normalizedAllForSync = data.allPubgAccounts ? normalizeAccounts(data.allPubgAccounts) : normalizedAccountsForSync;
+
       fetch('/api/store/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           products: data.products,
-          pubgAccounts: data.pubgAccounts,
-          allPubgAccounts: data.allPubgAccounts || data.pubgAccounts,
+          pubgAccounts: normalizedAccountsForSync,
+          allPubgAccounts: normalizedAllForSync,
           ucPackages: data.ucPackages,
           settings: data.settings,
           pubgSubmissions: data.pubgSubmissions,

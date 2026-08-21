@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Gamepad2 } from 'lucide-react';
 import { Logo } from './Logo';
+import { soundEngine } from '../utils/soundEngine';
 
 interface SplashScreenProps {
   onComplete?: () => void;
@@ -16,6 +17,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    // Play dynamic and elegant intro sound on entry
+    soundEngine.playIntroDynamicSound();
+
     // Progress bar animation
     const startTime = Date.now();
     const interval = setInterval(() => {

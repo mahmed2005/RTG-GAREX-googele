@@ -1,5 +1,6 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
+import { getEmbeddableVideoUrl } from './PubgVideoPlayer';
 import { X, Play, ExternalLink } from 'lucide-react';
 
 export const VideoPreviewModal: React.FC = () => {
@@ -7,14 +8,8 @@ export const VideoPreviewModal: React.FC = () => {
 
   if (!previewVideoUrl) return null;
 
-  const isGoogleDrive = previewVideoUrl.includes('drive.google.com');
-  const isYouTube = previewVideoUrl.includes('youtube.com') || previewVideoUrl.includes('youtu.be');
-
-  // Convert Drive view link to preview embed if needed
-  let embedUrl = previewVideoUrl;
-  if (isGoogleDrive && previewVideoUrl.includes('/view')) {
-    embedUrl = previewVideoUrl.replace('/view', '/preview');
-  }
+  const { type, embedUrl, rawUrl } = getEmbeddableVideoUrl(previewVideoUrl);
+  const isGoogleDrive = type === 'drive';
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
@@ -28,7 +23,7 @@ export const VideoPreviewModal: React.FC = () => {
       {/* Modal Container */}
       <div
         id="video-preview-card"
-        className="relative w-full max-w-2xl bg-[#11131c] border border-white/10 rounded-3xl shadow-2xl p-4 sm:p-6 text-right z-10 overflow-hidden"
+        className="relative w-full max-w-3xl bg-[#11131c] border border-white/10 rounded-3xl shadow-2xl p-4 sm:p-6 text-right z-10 overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
@@ -41,16 +36,16 @@ export const VideoPreviewModal: React.FC = () => {
             >
               <X className="w-5 h-5" />
             </button>
-            {isGoogleDrive && (
+            {rawUrl && (
               <a
-                href={previewVideoUrl}
+                href={rawUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors text-xs flex items-center gap-1"
-                title="فتح في Google Drive"
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors text-xs flex items-center gap-1.5 font-medium"
+                title="فتح الرابط في نافذة جديدة"
               >
-                <ExternalLink className="w-4 h-4" />
-                <span className="hidden sm:inline">فتح في نافذة جديدة</span>
+                <ExternalLink className="w-4 h-4 text-red-400" />
+                <span className="hidden sm:inline">فتح في نافذة مستقلة</span>
               </a>
             )}
           </div>
@@ -62,19 +57,20 @@ export const VideoPreviewModal: React.FC = () => {
 
         {/* Video Player */}
         <div className="relative rounded-2xl overflow-hidden bg-black aspect-video border border-white/10 flex items-center justify-center">
-          {isGoogleDrive || isYouTube ? (
+          {type === 'drive' || type === 'youtube' ? (
             <iframe
               src={embedUrl}
               title="Account Video Preview"
-              allow="autoplay; encrypted-media"
+              allow="autoplay; encrypted-media; fullscreen"
               allowFullScreen
               className="w-full h-full border-0"
             />
           ) : (
             <video
-              src={previewVideoUrl}
+              src={embedUrl}
               controls
               autoPlay
+              playsInline
               className="w-full h-full object-contain"
             />
           )}
@@ -83,3 +79,4 @@ export const VideoPreviewModal: React.FC = () => {
     </div>
   );
 };
+

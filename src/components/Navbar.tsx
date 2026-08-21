@@ -3,6 +3,7 @@ import { useStore, PageType } from '../context/StoreContext';
 import { Logo } from './Logo';
 import { MobileDrawer } from './MobileDrawer';
 import { SearchModal } from './SearchModal';
+import { soundEngine } from '../utils/soundEngine';
 import { ShoppingBag, Menu, Settings, Search } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -30,7 +31,10 @@ export const Navbar: React.FC = () => {
             {/* Mobile Hamburger Menu */}
             <button
               id="mobile-menu-toggle-btn"
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={() => {
+                soundEngine.playButtonClick();
+                setIsDrawerOpen(true);
+              }}
               className="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-colors md:hidden"
               aria-label="فتح القائمة"
             >
@@ -40,7 +44,10 @@ export const Navbar: React.FC = () => {
             {/* Global Search Button */}
             <button
               id="header-search-btn"
-              onClick={() => setIsSearchOpen(true)}
+              onClick={() => {
+                soundEngine.playButtonClick();
+                setIsSearchOpen(true);
+              }}
               className="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-all hover:border-red-500/40 group flex items-center gap-2"
               aria-label="بحث شامل في المتجر"
             >
@@ -51,7 +58,10 @@ export const Navbar: React.FC = () => {
             {/* Shopping Cart Button */}
             <button
               id="header-cart-btn"
-              onClick={() => setIsCartOpen(true)}
+              onClick={() => {
+                soundEngine.playButtonClick();
+                setIsCartOpen(true);
+              }}
               className="relative p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 transition-all hover:border-red-500/40 group"
               aria-label="عرض سلة المشتريات"
             >

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
+import { PubgVideoPlayer } from './PubgVideoPlayer';
 import { X, MessageCircle, ShieldCheck, UserCheck } from 'lucide-react';
 
 export const PubgAccountModal: React.FC = () => {
@@ -49,22 +50,34 @@ export const PubgAccountModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Account Info Box */}
-        <div className="p-4 bg-[#181b27] border border-white/5 rounded-2xl space-y-2.5 mb-5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-600/20 border border-red-500/30 text-red-400 font-bold">
-              {selectedAccountForBuy.badge} • {selectedAccountForBuy.level}
-            </span>
-            <span className="text-lg font-black text-red-500 font-mono">
-              {selectedAccountForBuy.price.toLocaleString()} د.ل
-            </span>
-          </div>
-          <h4 className="text-sm font-bold text-white">
-            {selectedAccountForBuy.title}
-          </h4>
-          <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-semibold pt-1">
-            <ShieldCheck className="w-4 h-4" />
-            <span>حساب مفحوص ومضمون مع تسليم مباشر</span>
+        {/* Account Info Box & Video Player */}
+        <div className="bg-[#181b27] border border-white/5 rounded-2xl overflow-hidden space-y-2.5 mb-5">
+          {selectedAccountForBuy.videoUrl && (
+            <PubgVideoPlayer
+              videoUrl={selectedAccountForBuy.videoUrl}
+              thumbnailUrl={selectedAccountForBuy.image}
+              title={selectedAccountForBuy.title}
+              badge={selectedAccountForBuy.badge}
+              level={selectedAccountForBuy.level}
+            />
+          )}
+          
+          <div className="p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-red-600/20 border border-red-500/30 text-red-400 font-bold">
+                {selectedAccountForBuy.badge} • {selectedAccountForBuy.level}
+              </span>
+              <span className="text-lg font-black text-red-500 font-mono">
+                {selectedAccountForBuy.price.toLocaleString()} د.ل
+              </span>
+            </div>
+            <h4 className="text-sm font-bold text-white">
+              {selectedAccountForBuy.title}
+            </h4>
+            <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-semibold pt-1">
+              <ShieldCheck className="w-4 h-4" />
+              <span>حساب مفحوص ومضمون مع تسليم مباشر</span>
+            </div>
           </div>
         </div>
 

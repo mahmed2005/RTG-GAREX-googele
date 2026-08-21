@@ -1,6 +1,8 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { PubgAccount } from '../types';
+import { PubgVideoPlayer } from './PubgVideoPlayer';
+import { soundEngine } from '../utils/soundEngine';
 import { 
   ShieldCheck, 
   Sparkles, 
@@ -23,6 +25,7 @@ export const PubgAccountsPage: React.FC = () => {
   } = useStore();
 
   const handleOpenGoogleForm = () => {
+    soundEngine.playButtonClick();
     const formUrl = settings.googleFormUrl || 'https://forms.gle/LCS6CgXUWciHH21k8';
     window.open(formUrl, '_blank');
   };
@@ -63,7 +66,7 @@ export const PubgAccountsPage: React.FC = () => {
                   تريد بيع حسابك؟
                 </h3>
                 <p className="text-slate-400 text-xs">
-                  اضغط لتعبئة نموذج Google Form الرسمي وسيتم مراجعة حسابك واعتماده للعرض بالمتجر
+                  اضغط لتعبئة نموذج بيع الحساب وسيتم مراجعة حسابك وفحصه واعتماده للعرض بالمتجر
                 </p>
               </div>
             </div>
@@ -87,7 +90,7 @@ export const PubgAccountsPage: React.FC = () => {
             </div>
             <h3 className="text-lg font-bold text-white mb-2">لا توجد حسابات معروضة حالياً</h3>
             <p className="text-slate-400 text-xs leading-relaxed mb-6">
-              كن أول من يعرض حسابه للبيع في المتجر! املأ نموذج Google Form وسيتم إضافته إلى Google Sheet واعتماده للعرض فوراً.
+              كن أول من يعرض حسابه للبيع في المتجر! املأ نموذج عرض الحساب وسيتم إضافته ومراجعته واعتماده للعرض فوراً.
             </p>
             <button
               onClick={handleOpenGoogleForm}
@@ -105,36 +108,15 @@ export const PubgAccountsPage: React.FC = () => {
                 id={`pubg-account-card-${acc.id}`}
                 className="bg-[#12141e] border border-white/10 hover:border-red-500/30 rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between transition-all duration-300 group"
               >
-                {/* Media Thumbnail with Video / Play button */}
-                <div className="relative w-full aspect-video bg-black/60 overflow-hidden">
-                  <img
-                    src={acc.image || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80'}
-                    alt={acc.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-85"
-                  />
-
-                  {/* Level and Rank Badges */}
-                  <div className="absolute top-3 left-3 flex items-center gap-2">
-                    <span className="px-3 py-1 rounded-xl bg-red-600 text-white font-black text-xs shadow-md">
-                      {acc.badge || 'حساب موثق'}
-                    </span>
-                    <span className="px-2.5 py-1 rounded-xl bg-black/70 backdrop-blur-md text-white font-mono font-bold text-xs border border-white/10">
-                      {acc.level}
-                    </span>
-                  </div>
-
-                  {/* Video Play Overlay */}
-                  {acc.videoUrl && (
-                    <button
-                      id={`play-video-acc-${acc.id}`}
-                      onClick={() => setPreviewVideoUrl(acc.videoUrl!)}
-                      className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-red-600/80 hover:bg-red-600 text-white flex items-center justify-center shadow-2xl backdrop-blur-xs transition-transform hover:scale-110"
-                      aria-label="مشاهدة فيديو الحساب"
-                    >
-                      <Play className="w-6 h-6 fill-white ml-0.5" />
-                    </button>
-                  )}
-                </div>
+                {/* Media Video / Player in the upper section */}
+                <PubgVideoPlayer
+                  videoUrl={acc.videoUrl}
+                  thumbnailUrl={acc.image}
+                  title={acc.title}
+                  badge={acc.badge || 'حساب موثق'}
+                  level={acc.level}
+                  onExpand={(url) => setPreviewVideoUrl(url)}
+                />
 
                 {/* Account Content */}
                 <div className="p-6 flex-1 flex flex-col justify-between text-right">
@@ -210,7 +192,10 @@ export const PubgAccountsPage: React.FC = () => {
 
                     <button
                       id={`buy-account-btn-${acc.id}`}
-                      onClick={() => setSelectedAccountForBuy(acc)}
+                      onClick={() => {
+                        soundEngine.playButtonClick();
+                        setSelectedAccountForBuy(acc);
+                      }}
                       className="px-6 py-3 bg-red-600 hover:bg-red-500 active:scale-95 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-red-950/60 transition-all flex items-center gap-2"
                     >
                       <ShoppingBag className="w-4 h-4" />

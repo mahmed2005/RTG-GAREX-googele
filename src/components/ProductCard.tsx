@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
 import { useStore } from '../context/StoreContext';
+import { soundEngine } from '../utils/soundEngine';
 import { ShoppingCart, Check } from 'lucide-react';
 
 interface ProductCardProps {
@@ -12,6 +13,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const [added, setAdded] = useState(false);
 
   const handleAddToCart = () => {
+    soundEngine.playSuccessSound();
     addToCart(product, 1);
     setAdded(true);
     setTimeout(() => {

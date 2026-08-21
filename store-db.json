@@ -1,17 +1,6 @@
 {
   "products": [
     {
-      "id": "prod-5",
-      "name": "Logitech G502 Hero",
-      "category": "ماوس",
-      "price": 348,
-      "oldPrice": 420,
-      "image": "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?auto=format&fit=crop&w=800&q=80",
-      "description": "ماوس",
-      "inStock": true,
-      "featured": true
-    },
-    {
       "id": "prod-7",
       "name": "Blue Yeti USB",
       "category": "ميكروفونات",
@@ -65,6 +54,72 @@
       "features": [
         "57 ميثيك",
         "63",
+        "تسليم آمن ومضمون"
+      ]
+    },
+    {
+      "id": "46088.612490671294",
+      "ownerName": "يوسف",
+      "accountName": "YOUSEF",
+      "title": "YOUSEF",
+      "badge": "حساب موثق",
+      "level": "LVL 88",
+      "accountLevel": "88",
+      "mythicsCount": "34",
+      "apartmentLevel": "44",
+      "goldCount": "32",
+      "upgradableWeaponsCount": "77",
+      "carsCount": "11",
+      "hashtagsCount": "5",
+      "linkedServices": "اي كلاود",
+      "linkedAccounts": "اي كلاود",
+      "price": 350,
+      "salePrice": "350",
+      "sellerPhone": "0935945888",
+      "transferPhone": "09284987565",
+      "storeReceivePhone": "https://drive.google.com/open?id=1or8YhizRINCy32kdTfJMI0bC4wZPrvoJ",
+      "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
+      "videoUrl": "",
+      "siteRating": "5",
+      "displayOnSite": "نعم",
+      "approved": true,
+      "isAvailable": true,
+      "features": [
+        "34 ميثيك",
+        "77",
+        "تسليم آمن ومضمون"
+      ]
+    },
+    {
+      "id": "46207.653465509255",
+      "ownerName": "محمد",
+      "accountName": "RTG ",
+      "title": "RTG ",
+      "badge": "حساب موثق",
+      "level": "LVL 67",
+      "accountLevel": "67",
+      "mythicsCount": "‏7",
+      "apartmentLevel": "‏67",
+      "goldCount": "‏7",
+      "upgradableWeaponsCount": "‏8",
+      "carsCount": "‏11",
+      "hashtagsCount": "‏5",
+      "linkedServices": "فيسبوك",
+      "linkedAccounts": "فيسبوك",
+      "price": 0,
+      "salePrice": "‏5000",
+      "sellerPhone": "‏0926382555",
+      "transferPhone": "‏0937554499",
+      "storeReceivePhone": "https://drive.google.com/open?id=19V1Unmy_ps8idDbJzVkjiVeV4I0Tp3GY",
+      "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
+      "videoUrl": "5",
+      "siteRating": "5",
+      "displayOnSite": "نعم",
+      "approved": true,
+      "isAvailable": true,
+      "features": [
+        "‏7 ميثيك",
+        "‏8",
         "تسليم آمن ومضمون"
       ]
     }
@@ -127,8 +182,8 @@
       "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
       "videoUrl": "",
       "siteRating": "5",
-      "displayOnSite": "لا",
-      "approved": false,
+      "displayOnSite": "نعم",
+      "approved": true,
       "isAvailable": true,
       "features": [
         "34 ميثيك",
@@ -160,8 +215,8 @@
       "image": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80",
       "videoUrl": "5",
       "siteRating": "5",
-      "displayOnSite": "لا",
-      "approved": false,
+      "displayOnSite": "نعم",
+      "approved": true,
       "isAvailable": true,
       "features": [
         "‏7 ميثيك",
@@ -206,11 +261,11 @@
   "pubgSubmissions": [],
   "ucPackages": [
     {
-      "id": "uc-1787261945562",
+      "id": "uc-1787269971008",
       "ucAmount": 660,
       "bonusUc": 60,
-      "price": 35,
-      "isPopular": true,
+      "price": 90,
+      "isPopular": false,
       "isAvailable": true
     }
   ],
@@ -237,5 +292,5 @@
     "currency": "د.ل"
   },
   "orders": [],
-  "lastUpdated": "2026-08-20T23:49:10.295Z"
+  "lastUpdated": "2026-08-21T10:25:18.704Z"
 }

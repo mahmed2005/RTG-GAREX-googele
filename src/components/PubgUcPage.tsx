@@ -1,6 +1,7 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
 import { UcPackage } from '../types';
+import { soundEngine } from '../utils/soundEngine';
 import { Zap, ShieldCheck, Clock, CheckCircle2, Star, ExternalLink } from 'lucide-react';
 
 export const PubgUcPage: React.FC = () => {
@@ -138,7 +139,10 @@ export const PubgUcPage: React.FC = () => {
 
                       <button
                         id={`order-uc-btn-${pkg.id}`}
-                        onClick={() => setSelectedUcPackage(pkg)}
+                        onClick={() => {
+                          soundEngine.playButtonClick();
+                          setSelectedUcPackage(pkg);
+                        }}
                         className={`px-7 py-3 rounded-2xl font-bold text-xs sm:text-sm active:scale-95 transition-all ${
                           pkg.isPopular
                             ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-950/60 font-extrabold'
