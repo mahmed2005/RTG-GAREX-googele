@@ -8,6 +8,7 @@ import {
   INITIAL_UC_PACKAGES, 
   INITIAL_STORE_SETTINGS 
 } from './src/data/initialData';
+import { ALL_DELIVERY_RATES } from './src/data/deliveryData';
 
 const PORT = 3000;
 const DATA_FILE = path.join(process.cwd(), 'store-db.json');
@@ -19,6 +20,7 @@ interface StoreDatabase {
   allPubgAccounts: any[];
   pubgSubmissions: any[];
   ucPackages: any[];
+  deliveryRates: any[];
   settings: any;
   orders: any[];
   appsScriptUrl?: string;
@@ -31,6 +33,9 @@ function loadDatabase(): StoreDatabase {
       const raw = fs.readFileSync(DATA_FILE, 'utf8');
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.products) && parsed.products.length > 0) {
+        if (!parsed.deliveryRates || !Array.isArray(parsed.deliveryRates)) {
+          parsed.deliveryRates = ALL_DELIVERY_RATES;
+        }
         return parsed;
       }
     }
@@ -44,6 +49,7 @@ function loadDatabase(): StoreDatabase {
     allPubgAccounts: INITIAL_PUBG_ACCOUNTS,
     pubgSubmissions: [],
     ucPackages: INITIAL_UC_PACKAGES,
+    deliveryRates: ALL_DELIVERY_RATES,
     settings: INITIAL_STORE_SETTINGS,
     orders: [],
     lastUpdated: new Date().toISOString(),
@@ -80,6 +86,7 @@ async function startServer() {
       allPubgAccounts: db.allPubgAccounts,
       pubgSubmissions: db.pubgSubmissions,
       ucPackages: db.ucPackages,
+      deliveryRates: db.deliveryRates,
       settings: db.settings,
       orders: db.orders,
       lastUpdated: db.lastUpdated,
@@ -89,7 +96,7 @@ async function startServer() {
   // POST Sync Full Store Data from Client or Apps Script
   app.post('/api/store/sync', (req, res) => {
     try {
-      const { products, pubgAccounts, allPubgAccounts, ucPackages, settings, pubgSubmissions } = req.body;
+      const { products, pubgAccounts, allPubgAccounts, ucPackages, deliveryRates, settings, pubgSubmissions } = req.body;
       if (Array.isArray(products) && products.length > 0) {
         db.products = products;
       }
@@ -101,6 +108,9 @@ async function startServer() {
       }
       if (Array.isArray(ucPackages) && ucPackages.length > 0) {
         db.ucPackages = ucPackages;
+      }
+      if (Array.isArray(deliveryRates) && deliveryRates.length > 0) {
+        db.deliveryRates = deliveryRates;
       }
       if (Array.isArray(pubgSubmissions)) {
         db.pubgSubmissions = pubgSubmissions;
@@ -195,6 +205,43 @@ async function startServer() {
       db.ucPackages = db.ucPackages.filter(u => u.id !== id);
       saveDatabase(db);
       res.json({ status: 'success', message: 'UC Package deleted' });
+    } catch (e: any) {
+      res.status(500).json({ status: 'error', message: e.message });
+    }
+  });
+
+  // Delivery Rates CRUD
+  app.post('/api/store/delivery-rate', (req, res) => {
+    try {
+      const newRate = req.body;
+      if (!newRate.id) {
+        newRate.id = 'rate_' + Date.now();
+      }
+      db.deliveryRates = [newRate, ...db.deliveryRates];
+      saveDatabase(db);
+      res.json({ status: 'success', rate: newRate });
+    } catch (e: any) {
+      res.status(500).json({ status: 'error', message: e.message });
+    }
+  });
+
+  app.put('/api/store/delivery-rate/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      db.deliveryRates = db.deliveryRates.map(r => r.id === id ? { ...r, ...req.body } : r);
+      saveDatabase(db);
+      res.json({ status: 'success', message: 'Delivery rate updated' });
+    } catch (e: any) {
+      res.status(500).json({ status: 'error', message: e.message });
+    }
+  });
+
+  app.delete('/api/store/delivery-rate/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      db.deliveryRates = db.deliveryRates.filter(r => r.id !== id);
+      saveDatabase(db);
+      res.json({ status: 'success', message: 'Delivery rate deleted' });
     } catch (e: any) {
       res.status(500).json({ status: 'error', message: e.message });
     }

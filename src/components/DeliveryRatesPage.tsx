@@ -18,13 +18,13 @@ import {
 } from 'lucide-react';
 
 export const DeliveryRatesPage: React.FC = () => {
-  const { setCurrentPage, setIsCartOpen, settings } = useStore();
+  const { setCurrentPage, setIsCartOpen, settings, deliveryRates } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedZoneId, setSelectedZoneId] = useState<string>('all');
 
   // Filtered Delivery Rates based on search and selected zone
   const filteredRates = useMemo(() => {
-    return ALL_DELIVERY_RATES.filter((rate) => {
+    return deliveryRates.filter((rate) => {
       const matchesSearch =
         !searchQuery.trim() ||
         rate.name.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
@@ -36,7 +36,7 @@ export const DeliveryRatesPage: React.FC = () => {
 
       return matchesSearch && matchesZone;
     });
-  }, [searchQuery, selectedZoneId]);
+  }, [deliveryRates, searchQuery, selectedZoneId]);
 
   return (
     <div className="py-8 sm:py-12 min-h-screen text-right font-['Cairo',sans-serif]">
@@ -85,10 +85,10 @@ export const DeliveryRatesPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-2 px-2 text-[11px] text-slate-400 border-t border-white/5 pt-2">
             <span className="flex items-center gap-1 text-emerald-400 font-semibold">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>الأسعار رسمية ومحدثة مباشرة</span>
+              <span>الأسعار رسمية ومحدثة مباشرة من النظام</span>
             </span>
             <span className="text-slate-500">
-              إجمالي المناطق المغطاة: <strong className="text-white font-mono">{ALL_DELIVERY_RATES.length}</strong> منطقة ومدينة
+              إجمالي المناطق المغطاة: <strong className="text-white font-mono">{deliveryRates.length}</strong> منطقة ومدينة
             </span>
           </div>
         </div>
@@ -126,11 +126,12 @@ export const DeliveryRatesPage: React.FC = () => {
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>جميع المناطق ({ALL_DELIVERY_RATES.length})</span>
+              <span>جميع المناطق ({deliveryRates.length})</span>
             </button>
 
             {DELIVERY_ZONES.map((zone) => {
               const isSelected = selectedZoneId === zone.id;
+              const count = deliveryRates.filter((r) => r.zoneId === zone.id).length;
               return (
                 <button
                   key={zone.id}
@@ -145,7 +146,7 @@ export const DeliveryRatesPage: React.FC = () => {
                   }`}
                 >
                   <span>{zone.name}</span>
-                  <span className="mr-1.5 opacity-70 font-mono text-[11px]">({zone.priceDisplay})</span>
+                  <span className="mr-1.5 opacity-70 font-mono text-[11px]">({count > 0 ? count : zone.priceDisplay})</span>
                 </button>
               );
             })}
@@ -216,75 +217,93 @@ export const DeliveryRatesPage: React.FC = () => {
         ) : (
           /* Structured Regional Zones Grid matching the delivery rate card */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {DELIVERY_ZONES.filter((z) => selectedZoneId === 'all' || z.id === selectedZoneId).map((zone) => (
-              <div
-                key={zone.id}
-                className={`rounded-3xl border ${zone.borderColor} bg-gradient-to-b ${zone.bgColor} p-5 sm:p-6 flex flex-col justify-between space-y-5 shadow-xl hover:shadow-2xl transition-all group`}
-              >
-                <div className="space-y-4">
-                  {/* Zone Header */}
-                  <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
-                    <div>
-                      <span className={`inline-block px-2.5 py-0.5 rounded-lg border text-[11px] font-bold mb-1.5 ${zone.badgeColor}`}>
-                        {zone.name}
-                      </span>
-                      <h3 className="text-lg font-black text-white group-hover:text-red-400 transition-colors">
-                        {zone.name}
-                      </h3>
-                      {zone.description && (
-                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                          {zone.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Zone Price Badge */}
-                    <div className="text-left flex-shrink-0">
-                      <span className="block text-[10px] text-slate-400 font-bold">سعر التوصيل</span>
-                      <span className="text-xl font-black text-white font-mono tracking-tight text-red-400">
-                        {zone.priceDisplay}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Cities Tags Grid */}
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 block mb-2">
-                      المدن والمناطق المغطاة ({zone.cities.length}):
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {zone.cities.map((city, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-200 text-xs font-semibold transition-colors"
-                        >
-                          {city}
+            {DELIVERY_ZONES.filter((z) => selectedZoneId === 'all' || z.id === selectedZoneId).map((zone) => {
+              const zoneRates = deliveryRates.filter((r) => r.zoneId === zone.id);
+              const hasCustomRates = zoneRates.length > 0;
+              return (
+                <div
+                  key={zone.id}
+                  className={`rounded-3xl border ${zone.borderColor} bg-gradient-to-b ${zone.bgColor} p-5 sm:p-6 flex flex-col justify-between space-y-5 shadow-xl hover:shadow-2xl transition-all group`}
+                >
+                  <div className="space-y-4">
+                    {/* Zone Header */}
+                    <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+                      <div>
+                        <span className={`inline-block px-2.5 py-0.5 rounded-lg border text-[11px] font-bold mb-1.5 ${zone.badgeColor}`}>
+                          {zone.name}
                         </span>
-                      ))}
+                        <h3 className="text-lg font-black text-white group-hover:text-red-400 transition-colors">
+                          {zone.name}
+                        </h3>
+                        {zone.description && (
+                          <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                            {zone.description}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Zone Price Badge */}
+                      <div className="text-left flex-shrink-0">
+                        <span className="block text-[10px] text-slate-400 font-bold">سعر التوصيل</span>
+                        <span className="text-xl font-black text-white font-mono tracking-tight text-red-400">
+                          {zone.priceDisplay}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Cities Tags Grid */}
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 block mb-2">
+                        المدن والمناطق المغطاة ({hasCustomRates ? zoneRates.length : zone.cities.length}):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto custom-scrollbar p-1">
+                        {hasCustomRates ? (
+                          zoneRates.map((rate) => (
+                            <span
+                              key={rate.id}
+                              className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-200 text-xs font-semibold transition-colors flex items-center gap-1"
+                            >
+                              <span>{rate.name}</span>
+                              {rate.price && (
+                                <span className="text-[10px] text-red-400 font-mono">({rate.price} د.ل)</span>
+                              )}
+                            </span>
+                          ))
+                        ) : (
+                          zone.cities.map((city, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-200 text-xs font-semibold transition-colors"
+                            >
+                              {city}
+                            </span>
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Bottom Quick Action */}
-                <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                  <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>توصيل مضمون وسريع</span>
-                  </span>
+                  {/* Bottom Quick Action */}
+                  <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+                    <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>توصيل مضمون وسريع</span>
+                    </span>
 
-                  <button
-                    onClick={() => {
-                      soundEngine.playButtonClick();
-                      setCurrentPage('products');
-                    }}
-                    className="text-slate-300 hover:text-white font-bold text-[11px] flex items-center gap-1 group/btn"
-                  >
-                    <span>طلب منتجات</span>
-                    <ArrowLeft className="w-3.5 h-3.5 group-hover/btn:-translate-x-0.5 transition-transform" />
-                  </button>
+                    <button
+                      onClick={() => {
+                        soundEngine.playButtonClick();
+                        setCurrentPage('products');
+                      }}
+                      className="text-slate-300 hover:text-white font-bold text-[11px] flex items-center gap-1 group/btn"
+                    >
+                      <span>طلب منتجات</span>
+                      <ArrowLeft className="w-3.5 h-3.5 group-hover/btn:-translate-x-0.5 transition-transform" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

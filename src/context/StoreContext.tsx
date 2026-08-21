@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, PubgAccount, UcPackage, CartItem, Order, StoreSettings, LibyanCity, PubgSellSubmission } from '../types';
+import { Product, PubgAccount, UcPackage, CartItem, Order, StoreSettings, LibyanCity, PubgSellSubmission, DeliveryCityRate } from '../types';
 import { GoogleSheetsService } from '../services/googleSheets';
 import { AppsScriptService } from '../services/appsScript';
+import { ALL_DELIVERY_RATES } from '../data/deliveryData';
 import { 
   INITIAL_PRODUCTS, 
   INITIAL_PUBG_ACCOUNTS, 
@@ -24,6 +25,7 @@ interface StoreContextType {
   pubgAccounts: PubgAccount[];
   ucPackages: UcPackage[];
   cities: LibyanCity[];
+  deliveryRates: DeliveryCityRate[];
   settings: StoreSettings;
   orders: Order[];
   
@@ -101,6 +103,13 @@ interface StoreContextType {
   updateUcPackage: (id: string, pkg: Partial<UcPackage>) => void;
   deleteUcPackage: (id: string) => void;
 
+  // Delivery Rates Admin Actions
+  addDeliveryRate: (rate: Omit<DeliveryCityRate, 'id'>) => Promise<void>;
+  updateDeliveryRate: (id: string, rate: Partial<DeliveryCityRate>) => Promise<void>;
+  deleteDeliveryRate: (id: string) => Promise<void>;
+  resetDeliveryRates: () => Promise<void>;
+  syncDeliveryRatesToSheets: () => Promise<boolean>;
+
   updateSettings: (newSettings: Partial<StoreSettings>) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   deleteOrder: (orderId: string) => void;
@@ -113,6 +122,7 @@ const STORAGE_KEYS = {
   PRODUCTS: 'rtg_products_v4_unified',
   PUBG_ACCOUNTS: 'rtg_pubg_accounts_v4_unified',
   UC_PACKAGES: 'rtg_uc_packages_v4_unified',
+  DELIVERY_RATES: 'rtg_delivery_rates_v4_unified',
   SETTINGS: 'rtg_settings_v4_unified',
   ORDERS: 'rtg_orders_v4_unified',
   CART: 'rtg_cart_v4_unified',
@@ -157,6 +167,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return saved ? JSON.parse(saved) : INITIAL_UC_PACKAGES;
     } catch {
       return INITIAL_UC_PACKAGES;
+    }
+  });
+
+  const [deliveryRates, setDeliveryRates] = useState<DeliveryCityRate[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.DELIVERY_RATES);
+      return saved ? JSON.parse(saved) : ALL_DELIVERY_RATES;
+    } catch {
+      return ALL_DELIVERY_RATES;
     }
   });
 
@@ -227,6 +246,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
             setUcPackages(data.ucPackages);
           }
+          if (Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
+            setDeliveryRates(data.deliveryRates);
+          }
           if (data.settings && typeof data.settings === 'object') {
             setSettings((prev) => ({ ...prev, ...data.settings }));
           }
@@ -288,6 +310,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.ucPackages && Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
         setUcPackages(data.ucPackages);
       }
+      if (data.deliveryRates && Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
+        setDeliveryRates(data.deliveryRates);
+      }
       if (data.settings && typeof data.settings === 'object') {
         setSettings((prev) => ({ ...prev, ...data.settings }));
       }
@@ -304,6 +329,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           pubgAccounts: normalizedAccountsForSync,
           allPubgAccounts: normalizedAllForSync,
           ucPackages: data.ucPackages,
+          deliveryRates: data.deliveryRates || deliveryRates,
           settings: data.settings,
           pubgSubmissions: data.pubgSubmissions,
         }),
@@ -371,6 +397,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PUBG_SUBMISSIONS, JSON.stringify(pubgSubmissions));
   }, [pubgSubmissions]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DELIVERY_RATES, JSON.stringify(deliveryRates));
+  }, [deliveryRates]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cart));
@@ -922,6 +952,90 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Delivery Rates Admin CRUD
+  const addDeliveryRate = async (rate: Omit<DeliveryCityRate, 'id'>) => {
+    const newRate: DeliveryCityRate = {
+      ...rate,
+      id: `rate-${Date.now()}`,
+      priceDisplay: rate.priceDisplay || (rate.price ? `${rate.price} د.ل` : '25 د.ل'),
+    };
+    setDeliveryRates((prev) => [newRate, ...prev]);
+
+    // Save on local server
+    fetch('/api/store/delivery-rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newRate),
+    }).catch(() => {});
+
+    // Save to Google Sheets if connected
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.addDeliveryRate(appsScriptConfig.webAppUrl, newRate).catch(console.error);
+    }
+  };
+
+  const updateDeliveryRate = async (id: string, updated: Partial<DeliveryCityRate>) => {
+    setDeliveryRates((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              ...updated,
+              priceDisplay:
+                updated.priceDisplay !== undefined
+                  ? updated.priceDisplay
+                  : updated.price !== undefined
+                  ? `${updated.price} د.ل`
+                  : r.priceDisplay,
+            }
+          : r
+      )
+    );
+
+    // Update on local server
+    fetch(`/api/store/delivery-rate/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {});
+
+    // Update in Google Sheets
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.updateDeliveryRate(appsScriptConfig.webAppUrl, id, updated).catch(console.error);
+    }
+  };
+
+  const deleteDeliveryRate = async (id: string) => {
+    setDeliveryRates((prev) => prev.filter((r) => r.id !== id));
+
+    // Delete on local server
+    fetch(`/api/store/delivery-rate/${id}`, { method: 'DELETE' }).catch(() => {});
+
+    // Delete in Google Sheets
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.deleteDeliveryRate(appsScriptConfig.webAppUrl, id).catch(console.error);
+    }
+  };
+
+  const resetDeliveryRates = async () => {
+    setDeliveryRates(ALL_DELIVERY_RATES);
+    localStorage.removeItem(STORAGE_KEYS.DELIVERY_RATES);
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      AppsScriptService.saveDeliveryRates(appsScriptConfig.webAppUrl, ALL_DELIVERY_RATES).catch(console.error);
+    }
+  };
+
+  const syncDeliveryRatesToSheets = async (): Promise<boolean> => {
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (!appsScriptConfig.webAppUrl) return false;
+    return AppsScriptService.saveDeliveryRates(appsScriptConfig.webAppUrl, deliveryRates);
+  };
+
   // Admin Settings
   const updateSettings = (newSettings: Partial<StoreSettings>) => {
     setSettings((prev) => {
@@ -956,10 +1070,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setProducts(INITIAL_PRODUCTS);
     setPubgAccounts(INITIAL_PUBG_ACCOUNTS);
     setUcPackages(INITIAL_UC_PACKAGES);
+    setDeliveryRates(ALL_DELIVERY_RATES);
     setSettings(INITIAL_STORE_SETTINGS);
     localStorage.removeItem(STORAGE_KEYS.PRODUCTS);
     localStorage.removeItem(STORAGE_KEYS.PUBG_ACCOUNTS);
     localStorage.removeItem(STORAGE_KEYS.UC_PACKAGES);
+    localStorage.removeItem(STORAGE_KEYS.DELIVERY_RATES);
     localStorage.removeItem(STORAGE_KEYS.SETTINGS);
   };
 
@@ -974,6 +1090,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         pubgAccounts,
         ucPackages,
         cities,
+        deliveryRates,
         settings,
         orders,
         cart,
@@ -1016,6 +1133,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         addUcPackage,
         updateUcPackage,
         deleteUcPackage,
+        addDeliveryRate,
+        updateDeliveryRate,
+        deleteDeliveryRate,
+        resetDeliveryRates,
+        syncDeliveryRatesToSheets,
         updateSettings,
         updateOrderStatus,
         deleteOrder,

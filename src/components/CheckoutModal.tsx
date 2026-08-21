@@ -10,6 +10,7 @@ export const CheckoutModal: React.FC = () => {
     setIsCheckoutOpen,
     cart,
     cartTotal,
+    deliveryRates,
     submitGearOrder,
     setCurrentPage,
   } = useStore();
@@ -26,8 +27,8 @@ export const CheckoutModal: React.FC = () => {
   // Determine delivery rate based on selected city
   const cityDeliveryRate = useMemo(() => {
     if (!selectedCity) return null;
-    return findDeliveryRate(selectedCity);
-  }, [selectedCity]);
+    return findDeliveryRate(selectedCity, deliveryRates);
+  }, [selectedCity, deliveryRates]);
 
   if (!isCheckoutOpen) return null;
 

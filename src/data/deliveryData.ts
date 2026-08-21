@@ -363,13 +363,15 @@ export const ALL_DELIVERY_RATES: DeliveryCityRate[] = [
 /**
  * Utility helper to lookup delivery price and zone for any city input string
  */
-export const findDeliveryRate = (search: string): DeliveryCityRate | null => {
+export const findDeliveryRate = (search: string, customRates?: DeliveryCityRate[]): DeliveryCityRate | null => {
+  const rates = (customRates && customRates.length > 0) ? customRates : ALL_DELIVERY_RATES;
   if (!search || !search.trim()) return null;
   const clean = search.trim().toLowerCase();
 
   // 1. Direct exact or includes match
-  const found = ALL_DELIVERY_RATES.find(
+  const found = rates.find(
     (rate) =>
+      clean === rate.name.toLowerCase() ||
       clean.includes(rate.name.toLowerCase()) ||
       rate.name.toLowerCase().includes(clean) ||
       clean.includes(rate.id.toLowerCase())
@@ -378,28 +380,28 @@ export const findDeliveryRate = (search: string): DeliveryCityRate | null => {
 
   // 2. Zone lookup fallback
   if (clean.includes('طرابلس') || clean.includes('سوق الجمعة') || clean.includes('تاجوراء') || clean.includes('جنزور')) {
-    return ALL_DELIVERY_RATES[0];
+    return rates.find((r) => r.zoneId === 'tripoli_central') || rates[0] || null;
   }
   if (clean.includes('بنغازي')) {
-    return ALL_DELIVERY_RATES.find((r) => r.id === 'benghazi') || null;
+    return rates.find((r) => r.id === 'benghazi' || r.name.includes('بنغازي')) || null;
   }
   if (clean.includes('مصراتة')) {
-    return ALL_DELIVERY_RATES.find((r) => r.id === 'misrata') || null;
+    return rates.find((r) => r.id === 'misrata' || r.name.includes('مصراتة')) || null;
   }
   if (clean.includes('الزاوية') || clean.includes('زاوية')) {
-    return ALL_DELIVERY_RATES.find((r) => r.id === 'zawiya') || null;
+    return rates.find((r) => r.id === 'zawiya' || r.name.includes('الزاوية')) || null;
   }
   if (clean.includes('زوارة') || clean.includes('زواره')) {
-    return ALL_DELIVERY_RATES.find((r) => r.id === 'zwara') || null;
+    return rates.find((r) => r.id === 'zwara' || r.name.includes('زوارة')) || null;
   }
   if (clean.includes('الماية') || clean.includes('مايه') || clean.includes('المايه')) {
-    return ALL_DELIVERY_RATES.find((r) => r.id === 'maya') || null;
+    return rates.find((r) => r.id === 'maya' || r.name.includes('الماية')) || null;
   }
   if (clean.includes('غريان')) {
-    return ALL_DELIVERY_RATES.find((r) => r.id === 'gharyan') || null;
+    return rates.find((r) => r.id === 'gharyan' || r.name.includes('غريان')) || null;
   }
   if (clean.includes('سبها')) {
-    return ALL_DELIVERY_RATES.find((r) => r.id === 'sabha') || null;
+    return rates.find((r) => r.id === 'sabha' || r.name.includes('سبها')) || null;
   }
 
   return null;

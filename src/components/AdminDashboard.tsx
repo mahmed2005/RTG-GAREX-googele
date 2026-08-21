@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Product, PubgAccount, UcPackage, Category } from '../types';
 import { AppsScriptService, AppsScriptConfig, GOOGLE_APPS_SCRIPT_TEMPLATE } from '../services/appsScript';
+import { DeliveryRatesAdmin } from './DeliveryRatesAdmin';
 import { 
   Gamepad2, 
   UserCheck, 
@@ -12,25 +13,26 @@ import {
   Check, 
   X, 
   Phone, 
-  ExternalLink,
-  RefreshCw,
-  Copy,
-  Link2,
-  AlertCircle,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  MessageCircle,
-  LogOut,
-  Upload,
-  Image as ImageIcon,
-  ShieldCheck,
-  Share2,
-  Globe,
-  AlertTriangle
+  ExternalLink, 
+  RefreshCw, 
+  Copy, 
+  Link2, 
+  AlertCircle, 
+  CheckCircle2, 
+  Eye, 
+  EyeOff, 
+  MessageCircle, 
+  LogOut, 
+  Upload, 
+  Image as ImageIcon, 
+  ShieldCheck, 
+  Share2, 
+  Globe, 
+  AlertTriangle,
+  Truck
 } from 'lucide-react';
 
-type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'social_contact' | 'sheets_sync';
+type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'delivery_rates' | 'social_contact' | 'sheets_sync';
 
 interface DeleteItemState {
   type: 'product' | 'pubg_account' | 'pubg_uc';
@@ -51,6 +53,7 @@ export const AdminDashboard: React.FC = () => {
     ucPackages,
     addUcPackage,
     deleteUcPackage,
+    deliveryRates,
     settings,
     updateSettings,
     setCurrentPage,
@@ -411,8 +414,8 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* 5 Main Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-8">
+        {/* 6 Main Tabs */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-8">
           <button
             onClick={() => setActiveTab('products')}
             className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
@@ -450,6 +453,18 @@ export const AdminDashboard: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('delivery_rates')}
+            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+              activeTab === 'delivery_rates'
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
+                : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
+            }`}
+          >
+            <Truck className="w-4 h-4 flex-shrink-0" />
+            <span>أسعار التوصيل ({deliveryRates.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('social_contact')}
             className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
               activeTab === 'social_contact'
@@ -463,7 +478,7 @@ export const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('sheets_sync')}
-            className={`col-span-2 sm:col-span-1 p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
               activeTab === 'sheets_sync'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
@@ -1137,6 +1152,13 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* TAB: DELIVERY RATES MANAGEMENT */}
+        {activeTab === 'delivery_rates' && (
+          <div className="animate-fadeIn">
+            <DeliveryRatesAdmin />
           </div>
         )}
 

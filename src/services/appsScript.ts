@@ -3,7 +3,7 @@
  * Enables Google Sheets and Google Drive to act as a 100% free, real-time backend database for RTG Gear X
  */
 
-import { Product, PubgAccount, UcPackage, Order, StoreSettings, PubgSellSubmission } from '../types';
+import { Product, PubgAccount, UcPackage, Order, StoreSettings, PubgSellSubmission, DeliveryCityRate } from '../types';
 
 export interface AppsScriptConfig {
   webAppUrl: string;
@@ -387,6 +387,92 @@ function doPost(e) {
       return createJsonResponse({ status: 'success', message: 'تم تسجيل الطلب في Google Sheets' });
     }
 
+    // 12. إضافة أو تعديل أو حذف أسعار التوصيل
+    if (action === 'add_delivery_rate') {
+      var dRate = payload.data || payload;
+      var dSheet = ss.getSheetByName('أسعار التوصيل');
+      if (dSheet) {
+        var dId = dRate.id || 'rate-' + new Date().getTime();
+        dSheet.appendRow([
+          dId,
+          dRate.name || '',
+          dRate.zoneName || dRate.zoneId || 'داخل طرابلس',
+          dRate.price || '25',
+          dRate.priceDisplay || ((dRate.price || '25') + ' د.ل'),
+          dRate.estimatedTime || '24 - 48 ساعة',
+          dRate.notes || ''
+        ]);
+        return createJsonResponse({ status: 'success', message: 'تمت إضافة تسعيرة التوصيل للمدينة بنجاح', id: dId });
+      }
+    }
+
+    if (action === 'update_delivery_rate') {
+      var upRate = payload.data || payload;
+      var upRateId = String(payload.id || upRate.id || '').trim();
+      var dSheetUp = ss.getSheetByName('أسعار التوصيل');
+      if (dSheetUp) {
+        var dRows = dSheetUp.getDataRange().getValues();
+        for (var dri = 1; dri < dRows.length; dri++) {
+          var rId = String(dRows[dri][0] || '').trim();
+          var rName = String(dRows[dri][1] || '').trim();
+          if (rId === upRateId || (upRateId && rName === upRateId)) {
+            var updatedRow = [
+              upRateId || rId,
+              upRate.name !== undefined ? upRate.name : dRows[dri][1],
+              upRate.zoneName !== undefined ? upRate.zoneName : dRows[dri][2],
+              upRate.price !== undefined ? upRate.price : dRows[dri][3],
+              upRate.priceDisplay !== undefined ? upRate.priceDisplay : dRows[dri][4],
+              upRate.estimatedTime !== undefined ? upRate.estimatedTime : dRows[dri][5],
+              upRate.notes !== undefined ? upRate.notes : dRows[dri][6]
+            ];
+            dSheetUp.getRange(dri + 1, 1, 1, updatedRow.length).setValues([updatedRow]);
+            return createJsonResponse({ status: 'success', message: 'تم تحديث سعر وبيانات التوصيل بنجاح' });
+          }
+        }
+      }
+      return createJsonResponse({ status: 'error', message: 'المدينة أو التسعيرة غير موجودة' });
+    }
+
+    if (action === 'delete_delivery_rate') {
+      var delRateId = String(payload.id || '').trim();
+      var dSheetDel = ss.getSheetByName('أسعار التوصيل');
+      if (dSheetDel) {
+        var dRowsDel = dSheetDel.getDataRange().getValues();
+        for (var drd = 1; drd < dRowsDel.length; drd++) {
+          var rowRateId = String(dRowsDel[drd][0] || '').trim();
+          var rowRateName = String(dRowsDel[drd][1] || '').trim();
+          if (rowRateId === delRateId || (delRateId && rowRateName === delRateId)) {
+            dSheetDel.deleteRow(drd + 1);
+            return createJsonResponse({ status: 'success', message: 'تم حذف تسعيرة المدينة نهائياً من Google Sheets' });
+          }
+        }
+      }
+      return createJsonResponse({ status: 'success', message: 'تم تنفيذ الحذف بنجاح' });
+    }
+
+    if (action === 'save_delivery_rates' || action === 'sync_delivery_rates') {
+      var ratesList = payload.data || payload.rates || [];
+      var dSheetSave = ss.getSheetByName('أسعار التوصيل');
+      if (dSheetSave && Array.isArray(ratesList) && ratesList.length > 0) {
+        dSheetSave.clearContents();
+        var dHeader = ['المعرف (ID)', 'اسم المدينة / المنطقة', 'المنطقة الجغرافية (Zone)', 'سعر التوصيل (د.ل)', 'العرض النصي للسعر', 'الوقت المتوقع للتسليم', 'ملاحظات'];
+        var dRowsToInsert = ratesList.map(function(item) {
+          return [
+            item.id || ('rate-' + new Date().getTime()),
+            item.name || '',
+            item.zoneName || item.zoneId || '',
+            item.price || '',
+            item.priceDisplay || (item.price ? (item.price + ' د.ل') : ''),
+            item.estimatedTime || '24 - 48 ساعة',
+            item.notes || ''
+          ];
+        });
+        dSheetSave.getRange(1, 1, dRowsToInsert.length + 1, dHeader.length).setValues([dHeader].concat(dRowsToInsert));
+        dSheetSave.getRange(1, 1, 1, dHeader.length).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
+        return createJsonResponse({ status: 'success', message: 'تم حفظ ومزامنة كافة أسعار التوصيل في Google Sheets بنجاح!' });
+      }
+    }
+
     return createJsonResponse({ status: 'error', message: 'Unknown action' });
   } catch (err) {
     return createJsonResponse({ status: 'error', message: err.toString() });
@@ -593,12 +679,35 @@ function getAllStoreData(ss) {
     }
   }
 
+  // 5. أسعار التوصيل
+  var rateSheet = ss.getSheetByName('أسعار التوصيل');
+  var deliveryRates = [];
+  if (rateSheet) {
+    var rateData = rateSheet.getDataRange().getValues();
+    for (var rd = 1; rd < rateData.length; rd++) {
+      var rowD = rateData[rd];
+      if (rowD[0] && rowD[1]) {
+        deliveryRates.push({
+          id: String(rowD[0]),
+          name: String(rowD[1]),
+          zoneName: String(rowD[2] || ''),
+          zoneId: String(rowD[2] || ''),
+          price: rowD[3] ? (isNaN(Number(rowD[3])) ? String(rowD[3]) : Number(rowD[3])) : '25',
+          priceDisplay: String(rowD[4] || (rowD[3] ? (rowD[3] + ' د.ل') : '25 د.ل')),
+          estimatedTime: String(rowD[5] || '24 - 48 ساعة'),
+          notes: String(rowD[6] || '')
+        });
+      }
+    }
+  }
+
   return {
     products: products,
     pubgAccounts: pubgAccounts,
     allPubgAccounts: allPubgAccounts,
     ucPackages: ucPackages,
-    settings: settings
+    settings: settings,
+    deliveryRates: deliveryRates
   };
 }
 
@@ -635,6 +744,31 @@ function setupSheetsIfMissing(ss) {
     {
       name: 'باقات الشدات',
       headers: ['المعرف (ID)', 'كمية الشدات (UC)', 'شدات إضافية مجانية (Bonus)', 'السعر الأساسي (د.ل)', 'السعر بعد الخصم/الحسم (د.ل)', 'الشارة (Tag)', 'الأكثر طلباً؟ (نعم/لا)', 'متوفر للشحن؟ (نعم/لا)']
+    },
+    {
+      name: 'أسعار التوصيل',
+      headers: ['المعرف (ID)', 'اسم المدينة / المنطقة', 'المنطقة الجغرافية (Zone)', 'سعر التوصيل (د.ل)', 'العرض النصي للسعر', 'الوقت المتوقع للتسليم', 'ملاحظات'],
+      defaultRows: [
+        ['tripoli_central', 'داخل طرابلس (وسط البلد والأحياء الرئيسية)', 'داخل طرابلس', '15 - 20', '15 - 20 د.ل', '24 ساعة', 'سوق الجمعة، عين زارة، تاجوراء، جنزور، حي الأندلس'],
+        ['karimiya', 'الكريمية / أنجيلة', 'ضواحي طرابلس', '20', '20 د.ل', '24 - 48 ساعة', 'ضواحي طرابلس القريبة'],
+        ['swani', 'السواني / قصر بن غشير', 'ضواحي طرابلس', '25', '25 د.ل', '24 - 48 ساعة', 'النواحي الأربعة'],
+        ['qarabolli', 'القره بوللي / الخمس / زليتن', 'شرق طرابلس', '25', '25 د.ل', '24 - 48 ساعة', 'الساحل الشرقي'],
+        ['maya', 'الماية', 'غرب طرابلس', '25', '25 د.ل', '24 - 48 ساعة', 'غرب طرابلس'],
+        ['zawiya', 'الزاوية', 'غرب طرابلس', '25', '25 د.ل', '24 - 48 ساعة', 'غرب طرابلس'],
+        ['zwara', 'زوارة', 'غرب طرابلس', '25', '25 د.ل', '24 - 48 ساعة', 'غرب طرابلس'],
+        ['matrad', 'المطرد', 'غرب طرابلس', '20', '20 د.ل', '24 - 48 ساعة', 'غرب طرابلس'],
+        ['surman', 'صرمان / صبراتة / العجيلات', 'غرب طرابلس', '30', '30 د.ل', '24 - 48 ساعة', 'الساحل الغربي'],
+        ['gharyan', 'غريان', 'الجبل الغربي (نفوسة)', '25', '25 د.ل', '24 - 48 ساعة', 'الجبل الغربي'],
+        ['yafran', 'يفرن / ككلة / الزنتان / جادو', 'الجبل الغربي (نفوسة)', '35 - 40', '35 - 40 د.ل', '48 ساعة', 'مدن الجبل'],
+        ['misrata', 'مصراتة', 'المنطقة الوسطى', '25', '25 د.ل', '24 - 48 ساعة', 'المنطقة الوسطى'],
+        ['sirt', 'سرت / أجدابيا', 'المنطقة الوسطى', '30', '30 د.ل', '48 ساعة', 'المنطقة الوسطى'],
+        ['benghazi', 'بنغازي', 'المنطقة الشرقية (برقة)', '30', '30 د.ل', '48 ساعة', 'كبرى مدن الشرق'],
+        ['bayda', 'البيضاء / المرج / شحات / درنة', 'المنطقة الشرقية (برقة)', '35 - 40', '35 - 40 د.ل', '48 - 72 ساعة', 'الجبل الأخضر'],
+        ['tobruk', 'طبرق', 'المنطقة الشرقية (برقة)', '40', '40 د.ل', '48 - 72 ساعة', 'أقصى الشرق'],
+        ['sabha', 'سبها', 'المنطقة الجنوبية (فزان)', '35', '35 د.ل', '48 - 72 ساعة', 'عاصمة الجنوب'],
+        ['ubari', 'أوباري / مرزق / غات', 'المنطقة الجنوبية (فزان)', '45 - 50', '45 - 50 د.ل', '72 - 96 ساعة', 'الجنوب الغربي'],
+        ['kufra', 'جالو / أوجلة / الكفرة', 'الجنوب الشرقي (الواحات والكفرة)', '50', '50 د.ل', '72 - 96 ساعة', 'حوض الواحات']
+      ]
     },
     {
       name: 'صفحات التواصل',
@@ -833,6 +967,7 @@ export class AppsScriptService {
     pubgSubmissions?: PubgSellSubmission[];
     ucPackages: UcPackage[];
     settings?: Partial<StoreSettings>;
+    deliveryRates?: DeliveryCityRate[];
   }> {
     const inputUrl = (webAppUrl && webAppUrl.trim()) ? webAppUrl.trim() : DEFAULT_APPS_SCRIPT_URL;
     
@@ -874,6 +1009,7 @@ export class AppsScriptService {
               pubgSubmissions: Array.isArray(data.pubgSubmissions) ? data.pubgSubmissions : [],
               ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
               settings: data.settings || {},
+              deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
             };
           }
         }
@@ -899,6 +1035,7 @@ export class AppsScriptService {
             pubgSubmissions: Array.isArray(data.pubgSubmissions) ? data.pubgSubmissions : [],
             ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
             settings: data.settings || {},
+            deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
           };
         }
       } catch (jsonpErr: any) {
@@ -1099,6 +1236,59 @@ export class AppsScriptService {
     await this.sendPost(webAppUrl, {
       action: 'submit_order',
       data: order,
+    });
+    return true;
+  }
+
+  /**
+   * Add a delivery rate to Google Sheets
+   */
+  public static async addDeliveryRate(webAppUrl: string, rate: DeliveryCityRate): Promise<boolean> {
+    if (!webAppUrl || !webAppUrl.trim()) return false;
+
+    await this.sendPost(webAppUrl, {
+      action: 'add_delivery_rate',
+      data: rate,
+    });
+    return true;
+  }
+
+  /**
+   * Update a delivery rate in Google Sheets
+   */
+  public static async updateDeliveryRate(webAppUrl: string, id: string, rate: Partial<DeliveryCityRate>): Promise<boolean> {
+    if (!webAppUrl || !webAppUrl.trim()) return false;
+
+    await this.sendPost(webAppUrl, {
+      action: 'update_delivery_rate',
+      id,
+      data: rate,
+    });
+    return true;
+  }
+
+  /**
+   * Delete a delivery rate from Google Sheets
+   */
+  public static async deleteDeliveryRate(webAppUrl: string, id: string): Promise<boolean> {
+    if (!webAppUrl || !webAppUrl.trim()) return false;
+
+    await this.sendPost(webAppUrl, {
+      action: 'delete_delivery_rate',
+      id,
+    });
+    return true;
+  }
+
+  /**
+   * Save / Sync all delivery rates in Google Sheets
+   */
+  public static async saveDeliveryRates(webAppUrl: string, rates: DeliveryCityRate[]): Promise<boolean> {
+    if (!webAppUrl || !webAppUrl.trim()) return false;
+
+    await this.sendPost(webAppUrl, {
+      action: 'save_delivery_rates',
+      rates,
     });
     return true;
   }
