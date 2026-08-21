@@ -36,18 +36,45 @@ export const LatestProducts: React.FC = () => {
 
         {/* Grid or Empty State */}
         {latestList.length === 0 ? (
-          <div className="text-center py-12 bg-[#12141e] rounded-3xl border border-white/5 p-8 max-w-md mx-auto">
-            <PackagePlus className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-white mb-1">المتجر جاهز لإضافة منتجاتك</h3>
-            <p className="text-slate-400 text-xs mb-4">
-              يمكنك إضافة المنتجات من لوحة الإدارة وسيتم مزامنتها مع Google Sheet وعرضها هنا فوراً.
-            </p>
-            <button
-              onClick={() => setCurrentPage('admin')}
-              className="px-5 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition-all"
-            >
-              الانتقال للوحة التحكم
-            </button>
+          <div className="bg-[#12141f] rounded-3xl border border-white/10 p-8 sm:p-12 max-w-2xl mx-auto text-center shadow-2xl relative overflow-hidden">
+            {/* Background subtle glow */}
+            <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-600/15 border border-red-500/30 flex items-center justify-center text-red-400 mx-auto shadow-lg shadow-red-950/40">
+                <PackagePlus className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h3 className="text-lg sm:text-xl font-black text-white">
+                  قريباً وصول تشكيلة جديدة من معدات الجيمنج
+                </h3>
+                <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+                  يتم حالياً تجهيز وتحديث قائمة المنتجات الحصرية. يمكنك تصفح حسابات ببجي وباقات الشدات المتوفرة الآن أو إضافة منتجاتك عبر لوحة التحكم.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                <button
+                  onClick={() => setCurrentPage('pubg_accounts')}
+                  className="px-5 py-2.5 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl text-xs font-bold transition-all"
+                >
+                  تصفح حسابات PUBG
+                </button>
+                <button
+                  onClick={() => setCurrentPage('pubg_uc')}
+                  className="px-5 py-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition-all"
+                >
+                  شحن شدات UC
+                </button>
+                <button
+                  onClick={() => setCurrentPage('admin')}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-red-950/50"
+                >
+                  + إضافة منتجات من لوحة الإدارة
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

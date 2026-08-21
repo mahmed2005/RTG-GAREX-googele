@@ -121,28 +121,29 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Header Bar */}
-        <div className="p-4 sm:p-5 border-b border-white/10 flex items-center gap-3 bg-[#141724]">
-          <Search className="w-5 h-5 text-red-400 flex-shrink-0" />
+        <div className="p-4 sm:p-5 border-b border-white/10 flex items-center gap-3 bg-[#12141f]">
+          <Search className="w-5 h-5 text-red-500 flex-shrink-0" />
           <input
             type="text"
             id="global-search-input"
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="ابحث عن كاميرات مراقبة، سماعات، ماوس، كيبورد، مبرد، حسابات ببجي، شدات..."
-            className="flex-1 bg-transparent text-white placeholder:text-slate-400 text-sm sm:text-base outline-none font-medium"
+            placeholder="ابحث عن أي منتج، كاميرا، ماوس، سماعة، حساب ببجي، باقة شدات..."
+            className="flex-1 bg-transparent text-white placeholder:text-slate-400 text-sm sm:text-base outline-none font-semibold"
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10"
+              title="مسح البحث"
             >
               <X className="w-4 h-4" />
             </button>
           )}
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold border border-white/10 transition-colors"
+            className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold border border-white/10 transition-colors"
           >
             إغلاق
           </button>

@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
+import { GoogleGenAI } from '@google/genai';
 import { 
   INITIAL_PRODUCTS, 
   INITIAL_PUBG_ACCOUNTS, 
@@ -12,6 +13,16 @@ import { ALL_DELIVERY_RATES } from './src/data/deliveryData';
 
 const PORT = 3000;
 const DATA_FILE = path.join(process.cwd(), 'store-db.json');
+
+// Initialize Google GenAI lazily
+let genAiClient: GoogleGenAI | null = null;
+function getGenAi(): GoogleGenAI {
+  if (!genAiClient) {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.FIREBASE_API_KEY;
+    genAiClient = new GoogleGenAI(apiKey ? { apiKey } : undefined);
+  }
+  return genAiClient;
+}
 
 // In-Memory Database initialized with default fallback or saved file
 interface StoreDatabase {
@@ -276,6 +287,42 @@ async function startServer() {
       res.json({ status: 'success', settings: db.settings });
     } catch (e: any) {
       res.status(500).json({ status: 'error', message: e.message });
+    }
+  });
+
+  // AI Description & Specs Generator (Powered by Gemini)
+  app.post('/api/generate-description', async (req, res) => {
+    try {
+      const { productName, category } = req.body;
+      if (!productName) {
+        return res.status(400).json({ status: 'error', message: 'اسم المنتج مطلوب' });
+      }
+
+      const prompt = `أنت خبير في كتابة أوصاف المنتجات لمتاجر الألعاب والإلكترونيات (Gaming & Tech Store).
+اكتب وصفاً تسويقياً موجزاً واحترافياً باللغة العربية ومواصفات نقطية واضحة للمنتج التالي:
+- اسم المنتج: ${productName}
+- فئة المنتج: ${category || 'إلكترونيات / جيمنج'}
+
+الشروط:
+1. أن يكون النص باللغة العربية الفصحى الواضحة والشيقة.
+2. يتضمن فقرة تقديمية قصيرة من سطرين، تليها 3 إلى 5 نقاط لأهم المميزات والمواصفات الفنية.
+3. مناسب لمتجر RTG GEAR X المتخصص في ليبيا.
+4. أرجع النص مباشرة بدون مقدمات أو ملاحظات إضافية.`;
+
+      const ai = getGenAi();
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.7-flash',
+        contents: prompt,
+      });
+
+      const description = response.text || '';
+      res.json({ status: 'success', description: description.trim() });
+    } catch (e: any) {
+      console.error('Gemini generation error:', e);
+      res.status(500).json({ 
+        status: 'error', 
+        message: e.message || 'تعذر توليد الوصف بالذكاء الاصطناعي حالياً' 
+      });
     }
   });
 

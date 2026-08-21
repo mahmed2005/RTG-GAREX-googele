@@ -29,7 +29,10 @@ import {
   Share2, 
   Globe, 
   AlertTriangle,
-  Truck
+  Truck,
+  Sparkles,
+  Edit3,
+  Save
 } from 'lucide-react';
 
 type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'delivery_rates' | 'social_contact' | 'sheets_sync';
@@ -50,9 +53,11 @@ export const AdminDashboard: React.FC = () => {
     pubgAccounts,
     togglePubgDisplay,
     deletePubgAccount,
+    updatePubgAccount,
     ucPackages,
     addUcPackage,
     deleteUcPackage,
+    updateUcPackage,
     deliveryRates,
     settings,
     updateSettings,
@@ -77,6 +82,8 @@ export const AdminDashboard: React.FC = () => {
 
   // Products Tab State
   const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isGeneratingAiDesc, setIsGeneratingAiDesc] = useState(false);
   const [productForm, setProductForm] = useState<Omit<Product, 'id'>>({
     name: '',
     category: 'سماعات',
@@ -90,6 +97,7 @@ export const AdminDashboard: React.FC = () => {
 
   // PUBG Accounts Tab State
   const [isAddingAccount, setIsAddingAccount] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<PubgAccount | null>(null);
   const [accountForm, setAccountForm] = useState({
     ownerName: '',
     accountName: '',
@@ -109,6 +117,7 @@ export const AdminDashboard: React.FC = () => {
 
   // UC Packages Tab State
   const [isAddingUc, setIsAddingUc] = useState(false);
+  const [editingUcPackage, setEditingUcPackage] = useState<UcPackage | null>(null);
   const [ucForm, setUcForm] = useState<Omit<UcPackage, 'id'>>({
     ucAmount: 660,
     bonusUc: 60,
@@ -135,6 +144,68 @@ export const AdminDashboard: React.FC = () => {
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMsg({ type, text });
     setTimeout(() => setToastMsg(null), 5000);
+  };
+
+  // AI Description Generator Handler
+  const handleGenerateAiDescription = async (target: 'add' | 'edit') => {
+    const name = target === 'add' ? productForm.name : editingProduct?.name;
+    const category = target === 'add' ? productForm.category : editingProduct?.category;
+
+    if (!name || !name.trim()) {
+      showToast('error', 'يرجى كتابة اسم المنتج أولاً لتوليد الوصف بالذكاء الاصطناعي');
+      return;
+    }
+
+    setIsGeneratingAiDesc(true);
+    try {
+      const res = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productName: name, category }),
+      });
+      const data = await res.json();
+      if (data.description) {
+        if (target === 'add') {
+          setProductForm((prev) => ({ ...prev, description: data.description }));
+        } else if (editingProduct) {
+          setEditingProduct((prev) => prev ? ({ ...prev, description: data.description }) : null);
+        }
+        showToast('success', '✨ تم توليد وصف المنتج بالذكاء الاصطناعي بنجاح!');
+      } else {
+        showToast('error', data.error || 'تعذر توليد الوصف، يرجى المحاولة لاحقاً');
+      }
+    } catch (err: any) {
+      showToast('error', 'حدث خطأ أثناء الاتصال بمحرك الذكاء الاصطناعي');
+    } finally {
+      setIsGeneratingAiDesc(false);
+    }
+  };
+
+  // Save Edited Product
+  const handleSaveEditedProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    updateProduct(editingProduct.id, editingProduct);
+    setEditingProduct(null);
+    showToast('success', `تم حفظ وتعديل المنتج "${editingProduct.name}" بنجاح!`);
+  };
+
+  // Save Edited PUBG Account
+  const handleSaveEditedAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAccount) return;
+    updatePubgAccount(editingAccount.id, editingAccount);
+    setEditingAccount(null);
+    showToast('success', `تم حفظ وتعديل حساب PUBG "${editingAccount.accountName || editingAccount.title}" بنجاح!`);
+  };
+
+  // Save Edited UC Package
+  const handleSaveEditedUcPackage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUcPackage) return;
+    updateUcPackage(editingUcPackage.id, editingUcPackage);
+    setEditingUcPackage(null);
+    showToast('success', `تم حفظ وتعديل باقة الشدات "${editingUcPackage.ucAmount} UC" بنجاح!`);
   };
 
   const handleLogout = () => {
@@ -598,12 +669,23 @@ export const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">الوصف والمواصفات</label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-300">الوصف والمواصفات</label>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateAiDescription('add')}
+                        disabled={isGeneratingAiDesc}
+                        className="px-3 py-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl text-[11px] font-bold flex items-center gap-1.5 shadow-md shadow-red-950/40 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAiDesc ? 'animate-spin' : 'text-amber-300'}`} />
+                        <span>{isGeneratingAiDesc ? 'جاري توليد الوصف...' : '✨ توليد وصف بالذكاء الاصطناعي (AI)'}</span>
+                      </button>
+                    </div>
                     <textarea
                       rows={3}
                       value={productForm.description}
                       onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                      placeholder="اكتب مواصفات المنتج ومميزاته..."
+                      placeholder="اكتب مواصفات ومميزات المنتج أو اضغط زر التوليد بالذكاء الاصطناعي بالأعلى لإنشائه فوراً..."
                       className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none resize-none"
                     />
                   </div>
@@ -661,13 +743,23 @@ export const AdminDashboard: React.FC = () => {
                       {prod.inStock ? 'متوفر بالمخزون' : 'غير متوفر'}
                     </button>
 
-                    <button
-                      onClick={() => setItemToDelete({ type: 'product', id: prod.id, name: prod.name })}
-                      className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
-                      title="حذف المنتج"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setEditingProduct(prod)}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors"
+                        title="تعديل بيانات المنتج"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => setItemToDelete({ type: 'product', id: prod.id, name: prod.name })}
+                        className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                        title="حذف المنتج"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -982,6 +1074,14 @@ export const AdminDashboard: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingAccount(acc)}
+                            className="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors"
+                            title="تعديل بيانات الحساب"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+
                           {/* Toggle Button (نعم / لا) */}
                           <button
                             onClick={() => handleToggleAccountDisplay(acc.id, acc.displayOnSite || (isApproved ? 'نعم' : 'لا'))}
@@ -1141,13 +1241,23 @@ export const AdminDashboard: React.FC = () => {
 
                   <div className="flex items-center justify-between pt-3 border-t border-white/5">
                     <span className="text-base font-black text-white font-mono">{pkg.price} د.ل</span>
-                    <button
-                      onClick={() => setItemToDelete({ type: 'pubg_uc', id: pkg.id, name: `${pkg.ucAmount} UC` })}
-                      className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
-                      title="حذف الباقة"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setEditingUcPackage(pkg)}
+                        className="p-1.5 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors"
+                        title="تعديل باقة الشدات"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => setItemToDelete({ type: 'pubg_uc', id: pkg.id, name: `${pkg.ucAmount} UC` })}
+                        className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
+                        title="حذف الباقة"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1564,6 +1674,381 @@ export const AdminDashboard: React.FC = () => {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL: EDIT PRODUCT DIALOG                                */}
+        {/* ========================================================= */}
+        {editingProduct && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 max-w-xl w-full shadow-2xl space-y-4 text-right font-['Cairo',sans-serif] max-h-[90vh] overflow-y-auto custom-scrollbar">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-red-500" />
+                  <span>تعديل بيانات المنتج</span>
+                </h3>
+                <button
+                  onClick={() => setEditingProduct(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditedProduct} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">اسم المنتج *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingProduct.name}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">فئة المنتج</label>
+                    <select
+                      value={editingProduct.category}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value as Category })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    >
+                      <option value="كاميرات مراقبة">كاميرات مراقبة</option>
+                      <option value="سماعات">سماعات</option>
+                      <option value="كيبورد">كيبوردات</option>
+                      <option value="ماوس">ماوسات</option>
+                      <option value="ميكروفونات">ميكروفونات</option>
+                      <option value="مبردات">مبردات</option>
+                      <option value="كروت شاشة">كروت شاشة</option>
+                      <option value="إكسسوارات">إكسسوارات</option>
+                      <option value="الكل">أخرى / عام</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">السعر (د.ل) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={editingProduct.price}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">السعر قبل الخصم (اختياري)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editingProduct.oldPrice || ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, oldPrice: e.target.value ? Number(e.target.value) : undefined })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">رابط صورة المنتج (URL)</label>
+                    <input
+                      type="url"
+                      value={editingProduct.image}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-300">الوصف والمواصفات</label>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateAiDescription('edit')}
+                        disabled={isGeneratingAiDesc}
+                        className="px-3 py-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl text-[11px] font-bold flex items-center gap-1.5 shadow-md shadow-red-950/40 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 ${isGeneratingAiDesc ? 'animate-spin' : 'text-amber-300'}`} />
+                        <span>{isGeneratingAiDesc ? 'جاري توليد الوصف...' : '✨ توليد وصف بالذكاء الاصطناعي (AI)'}</span>
+                      </button>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={editingProduct.description}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none resize-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="edit-prod-instock"
+                      checked={editingProduct.inStock}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, inStock: e.target.checked })}
+                      className="w-4 h-4 rounded text-red-600 focus:ring-0 bg-[#0e1017] border-white/10"
+                    />
+                    <label htmlFor="edit-prod-instock" className="text-xs font-bold text-slate-300 cursor-pointer">
+                      متوفر في المخزون
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct(null)}
+                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>حفظ التعديلات</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL: EDIT PUBG ACCOUNT DIALOG                           */}
+        {/* ========================================================= */}
+        {editingAccount && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 max-w-2xl w-full shadow-2xl space-y-4 text-right font-['Cairo',sans-serif] max-h-[90vh] overflow-y-auto custom-scrollbar">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Gamepad2 className="w-5 h-5 text-red-500" />
+                  <span>تعديل بيانات حساب PUBG Mobile</span>
+                </h3>
+                <button
+                  onClick={() => setEditingAccount(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditedAccount} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">اسم الحساب في اللعبة *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingAccount.accountName || editingAccount.title}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, accountName: e.target.value, title: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">اسم المالك</label>
+                    <input
+                      type="text"
+                      value={editingAccount.ownerName || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, ownerName: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">المستوى (Level)</label>
+                    <input
+                      type="text"
+                      value={editingAccount.level || editingAccount.accountLevel || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, level: e.target.value, accountLevel: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">عدد الميثيك</label>
+                    <input
+                      type="text"
+                      value={editingAccount.mythicsCount || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, mythicsCount: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">الأسلحة المطورة</label>
+                    <input
+                      type="text"
+                      value={editingAccount.upgradableWeaponsCount || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, upgradableWeaponsCount: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">سكنات السيارات</label>
+                    <input
+                      type="text"
+                      value={editingAccount.carsCount || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, carsCount: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">السعر المطلوب (د.ل) *</label>
+                    <input
+                      type="number"
+                      required
+                      value={editingAccount.price || editingAccount.salePrice || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, price: Number(e.target.value), salePrice: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">هاتف البائع</label>
+                    <input
+                      type="text"
+                      value={editingAccount.sellerPhone || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, sellerPhone: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">شارة الحساب (Badge)</label>
+                    <input
+                      type="text"
+                      value={editingAccount.badge || 'حساب موثق'}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, badge: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 md:col-span-3">
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">رابط فيديو الحساب (Google Drive أو YouTube أو فيديو مباشر)</label>
+                    <input
+                      type="url"
+                      value={editingAccount.videoUrl || ''}
+                      onChange={(e) => setEditingAccount({ ...editingAccount, videoUrl: e.target.value })}
+                      placeholder="https://drive.google.com/..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAccount(null)}
+                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>حفظ التعديلات</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* MODAL: EDIT UC PACKAGE DIALOG                             */}
+        {/* ========================================================= */}
+        {editingUcPackage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-right font-['Cairo',sans-serif]">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-amber-400" />
+                  <span>تعديل باقة شدات UC</span>
+                </h3>
+                <button
+                  onClick={() => setEditingUcPackage(null)}
+                  className="text-slate-400 hover:text-white p-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditedUcPackage} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">كمية الشدات (UC) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={editingUcPackage.ucAmount}
+                    onChange={(e) => setEditingUcPackage({ ...editingUcPackage, ucAmount: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">شدات إضافية مجانية (Bonus)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingUcPackage.bonusUc || 0}
+                    onChange={(e) => setEditingUcPackage({ ...editingUcPackage, bonusUc: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">السعر (د.ل) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={editingUcPackage.price}
+                    onChange={(e) => setEditingUcPackage({ ...editingUcPackage, price: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="edit-uc-popular"
+                    checked={editingUcPackage.isPopular || false}
+                    onChange={(e) => setEditingUcPackage({ ...editingUcPackage, isPopular: e.target.checked })}
+                    className="w-4 h-4 rounded text-red-600 focus:ring-0 bg-[#0e1017] border-white/10"
+                  />
+                  <label htmlFor="edit-uc-popular" className="text-xs font-bold text-slate-300 cursor-pointer">
+                    تمييز هذه الباقة كـ "الأكثر طلباً"
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setEditingUcPackage(null)}
+                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-lg flex items-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>حفظ التعديلات</span>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
