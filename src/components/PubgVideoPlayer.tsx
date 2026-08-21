@@ -153,10 +153,15 @@ export const PubgVideoPlayer: React.FC<PubgVideoPlayerProps> = ({
 
   const isDirectVideo = videoInfo.type === 'direct';
 
-  // Toggle Play / Pause
+  // Toggle Play / Pause or Open Modal
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     soundEngine.playButtonClick();
+
+    if (onExpand && videoUrl) {
+      onExpand(videoUrl);
+      return;
+    }
 
     if (isDirectVideo && videoRef.current) {
       if (videoRef.current.paused) {
