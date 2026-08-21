@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export const ContactPage: React.FC = () => {
-  const { settings } = useStore();
+  const { settings, setCurrentPage } = useStore();
 
   const socialLinks = [
     {
@@ -63,6 +63,31 @@ export const ContactPage: React.FC = () => {
           <p className="text-slate-400 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
             نحن متواجدون دائماً لخدمتك، تابعنا على منصات التواصل الاجتماعي لمعرفة أحدث العروض والمنتجات.
           </p>
+        </div>
+
+        {/* Delivery Rates Quick Access Card before social platforms */}
+        <div className="mb-10 p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-red-950/40 via-[#161825] to-red-950/40 border border-red-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center gap-4 text-right">
+            <div className="w-12 h-12 rounded-2xl bg-red-600/20 border border-red-500/30 text-red-400 flex items-center justify-center flex-shrink-0">
+              <Truck className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-white">
+                جدول أسعار التوصيل لجميع المدن والمناطق
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                طرابلس من 15 إلى 20 د.ل • شرق وغرب طرابلس والزاوية وزوارة والماية 25 د.ل • باقي المدن
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setCurrentPage('delivery_rates')}
+            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-950/60 transition-all cursor-pointer flex-shrink-0"
+          >
+            <Truck className="w-4 h-4" />
+            <span>عرض جدول أسعار التوصيل الكامل</span>
+          </button>
         </div>
 
         {/* Social Platforms Grid matching video */}
@@ -149,8 +174,16 @@ export const ContactPage: React.FC = () => {
               <div className="p-2 rounded-xl bg-red-600/10 text-red-400 flex-shrink-0">
                 <Truck className="w-5 h-5" />
               </div>
-              <div>
-                <h5 className="text-xs font-bold text-white mb-1">التوصيل والشحن</h5>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <button
+                    onClick={() => setCurrentPage('delivery_rates')}
+                    className="text-[10px] text-red-400 hover:text-red-300 hover:underline font-bold"
+                  >
+                    جدول الأسعار ↗
+                  </button>
+                  <h5 className="text-xs font-bold text-white">التوصيل والشحن</h5>
+                </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
                   {settings.shippingText}
                 </p>

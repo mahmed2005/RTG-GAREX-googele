@@ -144,6 +144,30 @@ export interface Order {
 export interface LibyanCity {
   name: string;
   regions: string[];
+  price?: number | string;
+  zone?: string;
+}
+
+export interface DeliveryCityRate {
+  id: string;
+  name: string;
+  price: number | string;
+  priceDisplay: string;
+  zoneId: string;
+  zoneName: string;
+  estimatedTime?: string;
+  notes?: string;
+}
+
+export interface DeliveryZoneGroup {
+  id: string;
+  name: string;
+  badgeColor: string;
+  borderColor: string;
+  bgColor: string;
+  priceDisplay: string;
+  description?: string;
+  cities: string[];
 }
 
 export interface StoreSettings {

@@ -10,6 +10,7 @@ import { DirectOrderBanner } from './components/DirectOrderBanner';
 import { ProductsPage } from './components/ProductsPage';
 import { PubgAccountsPage } from './components/PubgAccountsPage';
 import { PubgUcPage } from './components/PubgUcPage';
+import { DeliveryRatesPage } from './components/DeliveryRatesPage';
 import { ContactPage } from './components/ContactPage';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLogin } from './components/AdminLogin';
@@ -92,6 +93,7 @@ const AppContent: React.FC = () => {
             {currentPage === 'products' && <ProductsPage />}
             {currentPage === 'pubg_accounts' && <PubgAccountsPage />}
             {currentPage === 'pubg_uc' && <PubgUcPage />}
+            {currentPage === 'delivery_rates' && <DeliveryRatesPage />}
             {currentPage === 'contact' && <ContactPage />}
             {currentPage === 'admin' && (
               isAdminAuthenticated ? (

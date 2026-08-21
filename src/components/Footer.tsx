@@ -11,6 +11,8 @@ export const Footer: React.FC = () => {
     { id: 'products', label: 'منتجات المتجر' },
     { id: 'pubg_accounts', label: 'حسابات PUBG' },
     { id: 'pubg_uc', label: 'شراء شدات PUBG' },
+    { id: 'delivery_rates', label: 'أسعار التوصيل والشحن' },
+    { id: 'contact', label: 'تواصل معنا' },
   ];
 
   return (

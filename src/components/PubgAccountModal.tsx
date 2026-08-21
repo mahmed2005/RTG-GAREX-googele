@@ -10,6 +10,18 @@ export const PubgAccountModal: React.FC = () => {
 
   if (!selectedAccountForBuy) return null;
 
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Letters only (Arabic & English)
+    const filtered = e.target.value.replace(/[^a-zA-Z\u0600-\u06FF\s]/g, '');
+    setName(filtered);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Digits only
+    const filtered = e.target.value.replace(/\D/g, '');
+    setPhone(filtered);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !phone.trim()) return;
@@ -32,7 +44,7 @@ export const PubgAccountModal: React.FC = () => {
       {/* Modal Card */}
       <div
         id="account-modal-card"
-        className="relative w-full max-w-md bg-[#11131c] border border-white/10 rounded-3xl shadow-2xl p-6 text-right z-10 my-8"
+        className="relative w-full max-w-md bg-[#11131c] border border-white/10 rounded-3xl shadow-2xl p-6 text-right z-10 my-8 max-h-[90vh] overflow-y-auto custom-scrollbar"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
@@ -84,32 +96,39 @@ export const PubgAccountModal: React.FC = () => {
         {/* Buyer Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">
-              الاسم الكامل
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] text-slate-500">حروف فقط</span>
+              <label className="text-xs font-bold text-slate-300">
+                الاسم الكامل <span className="text-red-500">*</span>
+              </label>
+            </div>
             <input
               id="account-input-name"
               type="text"
               required
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={handleNameChange}
               placeholder="...أدخل اسمك"
-              className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-xl py-3 px-4 text-white text-sm placeholder:text-slate-500 outline-none transition-all"
+              className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-xl py-3 px-4 text-white text-sm placeholder:text-slate-500 outline-none transition-all text-right"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">
-              رقم الهاتف
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] text-slate-500">أرقام فقط</span>
+              <label className="text-xs font-bold text-slate-300">
+                رقم الهاتف <span className="text-red-500">*</span>
+              </label>
+            </div>
             <input
               id="account-input-phone"
               type="tel"
+              inputMode="numeric"
               required
               dir="ltr"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="09xxxxxxxx"
+              onChange={handlePhoneChange}
+              placeholder="09XXXXXXXX"
               className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-xl py-3 px-4 text-white text-sm placeholder:text-slate-500 outline-none text-right font-mono transition-all"
             />
           </div>
@@ -121,7 +140,7 @@ export const PubgAccountModal: React.FC = () => {
           <button
             type="submit"
             id="submit-buy-account-btn"
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2"
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <MessageCircle className="w-5 h-5 fill-white" />
             <span>متابعة الشراء عبر واتساب</span>

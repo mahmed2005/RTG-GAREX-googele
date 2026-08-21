@@ -12,7 +12,8 @@ import {
   Settings, 
   MessageCircle,
   ExternalLink,
-  Search
+  Search,
+  Truck
 } from 'lucide-react';
 
 interface MobileDrawerProps {
@@ -31,6 +32,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({ isOpen, onClose, onO
     { id: 'products', label: 'المنتجات', icon: <Gamepad2 className="w-5 h-5" /> },
     { id: 'pubg_accounts', label: 'حسابات PUBG', icon: <UserCheck className="w-5 h-5" /> },
     { id: 'pubg_uc', label: 'شدات PUBG', icon: <Zap className="w-5 h-5" /> },
+    { id: 'delivery_rates', label: 'أسعار التوصيل', icon: <Truck className="w-5 h-5" /> },
     { id: 'contact', label: 'تواصل معنا', icon: <PhoneCall className="w-5 h-5" /> },
   ];
 

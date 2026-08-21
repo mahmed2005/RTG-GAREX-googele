@@ -10,7 +10,7 @@ import {
   INITIAL_STORE_SETTINGS 
 } from '../data/initialData';
 
-export type PageType = 'home' | 'products' | 'pubg_accounts' | 'pubg_uc' | 'contact' | 'admin';
+export type PageType = 'home' | 'products' | 'pubg_accounts' | 'pubg_uc' | 'delivery_rates' | 'contact' | 'admin';
 
 interface StoreContextType {
   // Navigation
@@ -56,7 +56,9 @@ interface StoreContextType {
     phone: string;
     altPhone?: string;
     city: string;
-    region: string;
+    region?: string;
+    deliveryFee?: string | number;
+    notes?: string;
     paymentMethod: string;
   }) => void;
 
@@ -446,7 +448,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     phone: string;
     altPhone?: string;
     city: string;
-    region: string;
+    region?: string;
+    deliveryFee?: string | number;
+    notes?: string;
     paymentMethod: string;
   }) => {
     if (cart.length === 0) return;
@@ -458,7 +462,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       phone: customerData.phone,
       altPhone: customerData.altPhone,
       city: customerData.city,
-      region: customerData.region,
+      region: customerData.region || customerData.city,
+      notes: customerData.notes,
       paymentMethod: customerData.paymentMethod,
       items: cart.map((c) => ({
         productId: c.product.id,
@@ -476,14 +481,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Build WhatsApp message format matching video exactly:
     let message = `*طلب جديد من RTG Gear X* 🎮\n\n`;
-    message += `*معلومات العميل:*\n`;
+    message += `*معلومات العميل والتوصيل:*\n`;
     message += `الاسم: ${customerData.name}\n`;
     message += `الهاتف: ${customerData.phone}\n`;
     if (customerData.altPhone) {
       message += `رقم احتياطي: ${customerData.altPhone}\n`;
     }
-    message += `المدينة: ${customerData.city}\n`;
-    message += `المنطقة: ${customerData.region}\n`;
+    message += `المدينة / المنطقة: ${customerData.city}\n`;
+    if (customerData.region && customerData.region !== customerData.city) {
+      message += `العنوان التفصيلي: ${customerData.region}\n`;
+    }
+    if (customerData.deliveryFee) {
+      message += `سعر التوصيل: ${customerData.deliveryFee} د.ل\n`;
+    }
+    if (customerData.notes) {
+      message += `ملاحظات العميل: ${customerData.notes}\n`;
+    }
     message += `طريقة الدفع: ${customerData.paymentMethod === 'تحويل مصرفي' ? '💳 تحويل مصرفي' : '💵 كاش'}\n\n`;
     message += `*تفاصيل الطلب:*\n`;
 
@@ -492,7 +505,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       message += `الكمية: ${item.quantity} | السعر: ${item.product.price * item.quantity} د.ل\n`;
     });
 
-    message += `\n*الإجمالي: ${cartTotal} د.ل*`;
+    message += `\n*إجمالي المنتجات: ${cartTotal} د.ل*`;
+    if (customerData.deliveryFee && typeof customerData.deliveryFee === 'number') {
+      message += `\n*الإجمالي الكلي مع التوصيل: ${cartTotal + customerData.deliveryFee} د.ل*`;
+    } else if (customerData.deliveryFee) {
+      message += `\n*التوصيل التقديري: ${customerData.deliveryFee} د.ل*`;
+    }
 
     openWhatsApp(settings.whatsappNumber, message);
     clearCart();

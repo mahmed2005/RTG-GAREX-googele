@@ -16,6 +16,7 @@ export const Navbar: React.FC = () => {
     { id: 'products', label: 'المنتجات' },
     { id: 'pubg_accounts', label: 'حسابات PUBG' },
     { id: 'pubg_uc', label: 'شدات PUBG' },
+    { id: 'delivery_rates', label: 'أسعار التوصيل' },
     { id: 'contact', label: 'تواصل معنا' },
   ];
 

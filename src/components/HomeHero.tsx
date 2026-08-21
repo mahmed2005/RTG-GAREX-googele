@@ -59,18 +59,27 @@ export const HomeHero: React.FC = () => {
 
         {/* Quick Trust Highlights */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4 max-w-lg mx-auto mt-12 pt-8 border-t border-white/5 text-slate-400 text-xs">
-          <div className="flex flex-col items-center">
+          <button
+            onClick={() => setCurrentPage('products')}
+            className="flex flex-col items-center hover:text-white transition-colors cursor-pointer"
+          >
             <span className="text-white font-black text-sm sm:text-base font-mono">100%</span>
             <span>منتجات أصلية</span>
-          </div>
-          <div className="flex flex-col items-center border-x border-white/5">
+          </button>
+          <button
+            onClick={() => setCurrentPage('pubg_uc')}
+            className="flex flex-col items-center border-x border-white/5 hover:text-white transition-colors cursor-pointer"
+          >
             <span className="text-white font-black text-sm sm:text-base font-bold">فوري</span>
             <span>تسليم الشدات</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <span className="text-white font-black text-sm sm:text-base font-bold">شحن</span>
-            <span>لكل مدن ليبيا</span>
-          </div>
+          </button>
+          <button
+            onClick={() => setCurrentPage('delivery_rates')}
+            className="flex flex-col items-center hover:text-red-400 transition-colors cursor-pointer group"
+          >
+            <span className="text-red-400 font-black text-sm sm:text-base font-bold group-hover:underline">أسعار التوصيل</span>
+            <span>لكافة مدن ليبيا ↗</span>
+          </button>
         </div>
       </div>
     </section>

@@ -20,13 +20,27 @@ export const PubgUcModal: React.FC = () => {
 
   if (!selectedUcPackage) return null;
 
-  const handlePhoneChange = (val: string) => {
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Letters only (Arabic & English)
+    const filtered = e.target.value.replace(/[^a-zA-Z\u0600-\u06FF\s]/g, '');
+    setName(filtered);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Digits only
+    const val = e.target.value.replace(/\D/g, '');
     setPhone(val);
     if (val && (val.length < 9 || val.length > 12)) {
-      setPhoneError('رقم الهاتف غير صحيح (9-10 أرقام)');
+      setPhoneError('رقم الهاتف غير صحيح (مثال: 09XXXXXXXX)');
     } else {
       setPhoneError('');
     }
+  };
+
+  const handlePubgIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Digits only for PUBG ID
+    const val = e.target.value.replace(/\D/g, '');
+    setPubgId(val);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -79,7 +93,7 @@ export const PubgUcModal: React.FC = () => {
       {/* Modal Container */}
       <div
         id="uc-modal-card"
-        className="relative w-full max-w-md bg-[#11131c] border border-white/10 rounded-3xl shadow-2xl p-6 text-right z-10 my-8"
+        className="relative w-full max-w-md bg-[#11131c] border border-white/10 rounded-3xl shadow-2xl p-6 text-right z-10 my-8 max-h-[90vh] overflow-y-auto custom-scrollbar"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
@@ -140,7 +154,7 @@ export const PubgUcModal: React.FC = () => {
             <button
               id="close-uc-success-btn"
               onClick={handleClose}
-              className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-950/60 transition-colors"
+              className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-red-950/60 transition-colors cursor-pointer"
             >
               إغلاق
             </button>
@@ -165,32 +179,39 @@ export const PubgUcModal: React.FC = () => {
 
             {/* Customer Full Name */}
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                الاسم الكامل
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-slate-500">حروف فقط</span>
+                <label className="text-xs font-bold text-slate-300">
+                  الاسم الكامل <span className="text-red-500">*</span>
+                </label>
+              </div>
               <input
                 id="uc-input-name"
                 type="text"
                 required
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="أدخل اسمك بالعربي..."
-                className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-xl py-3 px-4 text-white text-sm placeholder:text-slate-500 outline-none transition-all"
+                onChange={handleNameChange}
+                placeholder="أدخل اسمك..."
+                className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-xl py-3 px-4 text-white text-sm placeholder:text-slate-500 outline-none transition-all text-right"
               />
             </div>
 
             {/* Customer Phone */}
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                رقم هاتفك
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-slate-500">أرقام فقط</span>
+                <label className="text-xs font-bold text-slate-300">
+                  رقم هاتفك <span className="text-red-500">*</span>
+                </label>
+              </div>
               <input
                 id="uc-input-phone"
                 type="tel"
+                inputMode="numeric"
                 required
                 dir="ltr"
                 value={phone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
+                onChange={handlePhoneChange}
                 placeholder="09XXXXXXXX"
                 className={`w-full bg-[#181b27] border rounded-xl py-3 px-4 text-white text-sm placeholder:text-slate-500 outline-none text-right font-mono transition-all ${
                   phoneError ? 'border-red-500 focus:ring-red-500' : 'border-white/10 focus:border-red-500'
@@ -206,21 +227,25 @@ export const PubgUcModal: React.FC = () => {
 
             {/* PUBG ID */}
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                # ID حسابك في PUBG Mobile
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-slate-500">أرقام فقط</span>
+                <label className="text-xs font-bold text-slate-300">
+                  # ID حسابك في PUBG Mobile <span className="text-red-500">*</span>
+                </label>
+              </div>
               <input
                 id="uc-input-pubgid"
                 type="text"
+                inputMode="numeric"
                 required
                 dir="ltr"
                 value={pubgId}
-                onChange={(e) => setPubgId(e.target.value)}
-                placeholder="XXXXXXXXXXXXX"
+                onChange={handlePubgIdChange}
+                placeholder="5123456789"
                 className="w-full bg-[#181b27] border border-white/10 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-xl py-3 px-4 text-white text-sm placeholder:text-slate-500 outline-none text-right font-mono transition-all"
               />
               <p className="text-[10px] text-slate-500 mt-1 text-right">
-                يمكن إيجاد الـ ID في إعدادات حسابك داخل اللعبة
+                يمكن إيجاد الـ ID في ملف حسابك التعريفي داخل اللعبة
               </p>
             </div>
 
@@ -228,7 +253,7 @@ export const PubgUcModal: React.FC = () => {
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-300 flex items-start gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
               <span>
-                بعد إرسال الطلب سيتم التواصل معك عبر واتساب لتحديد طريقة الدفع المناسبة (libyana أو حوالة)
+                بعد إرسال الطلب سيتم التواصل معك عبر واتساب لتحديد طريقة الدفع المناسبة (ليبيانا أو حوالة)
               </span>
             </div>
 
@@ -236,7 +261,7 @@ export const PubgUcModal: React.FC = () => {
             <button
               type="submit"
               id="submit-uc-order-btn"
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white rounded-2xl font-bold text-sm shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <MessageCircle className="w-5 h-5 fill-white" />
               <span>إرسال الطلب عبر واتساب</span>

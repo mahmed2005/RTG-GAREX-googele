@@ -271,7 +271,7 @@ export const SellAccountModal: React.FC = () => {
 
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1">
-                5. مستوى الشقة / الروم
+                5. مستوى السكي
               </label>
               <input
                 type="text"

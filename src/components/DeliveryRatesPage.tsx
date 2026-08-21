@@ -1,0 +1,363 @@
+import React, { useState, useMemo } from 'react';
+import { useStore } from '../context/StoreContext';
+import { ALL_DELIVERY_RATES, DELIVERY_ZONES } from '../data/deliveryData';
+import { soundEngine } from '../utils/soundEngine';
+import { 
+  Truck, 
+  Search, 
+  MapPin, 
+  Clock, 
+  ShieldCheck, 
+  CheckCircle2, 
+  ArrowLeft, 
+  MessageCircle, 
+  ShoppingBag,
+  Sparkles,
+  Layers,
+  Filter
+} from 'lucide-react';
+
+export const DeliveryRatesPage: React.FC = () => {
+  const { setCurrentPage, setIsCartOpen, settings } = useStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedZoneId, setSelectedZoneId] = useState<string>('all');
+
+  // Filtered Delivery Rates based on search and selected zone
+  const filteredRates = useMemo(() => {
+    return ALL_DELIVERY_RATES.filter((rate) => {
+      const matchesSearch =
+        !searchQuery.trim() ||
+        rate.name.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+        rate.zoneName.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+        rate.priceDisplay.toLowerCase().includes(searchQuery.trim().toLowerCase());
+
+      const matchesZone =
+        selectedZoneId === 'all' || rate.zoneId === selectedZoneId;
+
+      return matchesSearch && matchesZone;
+    });
+  }, [searchQuery, selectedZoneId]);
+
+  return (
+    <div className="py-8 sm:py-12 min-h-screen text-right font-['Cairo',sans-serif]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        
+        {/* 1. Page Header & Delivery Partner Badge */}
+        <div className="text-center space-y-4 max-w-3xl mx-auto">
+          {/* Partner Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-600/15 border border-red-500/30 text-red-400 text-xs font-bold shadow-sm">
+            <Truck className="w-4 h-4 text-red-500" />
+            <span>شركة درب السبيل لخدمات التوصيل • الإنطلاقة من طرابلس</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
+            أسعار التوصيل <span className="text-red-500">لكافة المدن الليبية</span>
+          </h1>
+
+          <p className="text-slate-400 text-xs sm:text-sm leading-relaxed max-w-2xl mx-auto">
+            تعرف على سعر ومدة التوصيل لمدينتك أو منطقتك بكل شفافية وسهولة قبل إتمام الطلب أو التواصل معنا. التوصيل يشمل كافة ربوع ليبيا من طرابلس إلى أقصى الشرق والجنوب.
+          </p>
+        </div>
+
+        {/* 2. Search & Interactive Lookup Bar */}
+        <div className="max-w-3xl mx-auto bg-[#12141f] border border-white/10 p-3 sm:p-4 rounded-3xl shadow-2xl space-y-3">
+          <div className="relative">
+            <input
+              id="delivery-search-input"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ابحث عن مدينتك أو منطقتك (مثال: الزاوية، بنغازي، سوق الجمعة، غريان، مصراتة)..."
+              className="w-full bg-[#181b28] border border-white/10 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-2xl py-3.5 pl-4 pr-11 text-white text-sm placeholder:text-slate-500 outline-none transition-all text-right"
+            />
+            <Search className="w-5 h-5 text-slate-400 absolute right-4 top-1/2 -translate-y-1/2" />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white bg-white/10 px-2 py-1 rounded-lg"
+              >
+                مسح
+              </button>
+            )}
+          </div>
+
+          {/* Quick Notice Summary Banner */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-2 text-[11px] text-slate-400 border-t border-white/5 pt-2">
+            <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>الأسعار رسمية ومحدثة مباشرة</span>
+            </span>
+            <span className="text-slate-500">
+              إجمالي المناطق المغطاة: <strong className="text-white font-mono">{ALL_DELIVERY_RATES.length}</strong> منطقة ومدينة
+            </span>
+          </div>
+        </div>
+
+        {/* 3. Regional Filter Tabs */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
+              <Filter className="w-4 h-4 text-red-500" />
+              <span>تصفية حسب المنطقة الجغرافية:</span>
+            </div>
+            {selectedZoneId !== 'all' && (
+              <button
+                onClick={() => {
+                  soundEngine.playButtonClick();
+                  setSelectedZoneId('all');
+                }}
+                className="text-[11px] text-red-400 hover:underline font-bold"
+              >
+                عرض كل المناطق
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+            <button
+              onClick={() => {
+                soundEngine.playButtonClick();
+                setSelectedZoneId('all');
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                selectedZoneId === 'all'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-950/60'
+                  : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-white/5'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>جميع المناطق ({ALL_DELIVERY_RATES.length})</span>
+            </button>
+
+            {DELIVERY_ZONES.map((zone) => {
+              const isSelected = selectedZoneId === zone.id;
+              return (
+                <button
+                  key={zone.id}
+                  onClick={() => {
+                    soundEngine.playButtonClick();
+                    setSelectedZoneId(zone.id);
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+                    isSelected
+                      ? `${zone.badgeColor} border-current shadow-lg`
+                      : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border-white/5'
+                  }`}
+                >
+                  <span>{zone.name}</span>
+                  <span className="mr-1.5 opacity-70 font-mono text-[11px]">({zone.priceDisplay})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 4. Display Modes: Search Results OR Regional Cards Grid */}
+        {searchQuery ? (
+          /* Search Results View */
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span>نتائج البحث عن: "{searchQuery}"</span>
+              <span className="font-bold text-white">{filteredRates.length} نتيجة</span>
+            </div>
+
+            {filteredRates.length === 0 ? (
+              <div className="p-12 text-center rounded-3xl bg-[#12141e] border border-white/10 space-y-3">
+                <MapPin className="w-10 h-10 text-slate-600 mx-auto" />
+                <h4 className="text-base font-bold text-white">لم يتم العثور على منطقة بهذا الاسم</h4>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  يرجى التأكد من كتابة اسم المدينة أو المنطقة بشكل صحيح أو التواصل معنا مباشرة عبر واتساب لمعرفة السعر.
+                </p>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-500 transition-colors"
+                >
+                  إعادة تعيين البحث
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {filteredRates.map((rate) => (
+                  <div
+                    key={rate.id}
+                    className="p-4 rounded-2xl bg-[#141724] border border-white/10 hover:border-red-500/40 transition-all flex items-center justify-between group shadow-md"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <h4 className="text-sm font-bold text-white group-hover:text-red-400 transition-colors">
+                          {rate.name}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 pr-6">
+                        <span>المنطقة: {rate.zoneName}</span>
+                        {rate.estimatedTime && (
+                          <>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 text-slate-500">
+                              <Clock className="w-3 h-3" />
+                              <span>{rate.estimatedTime}</span>
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-left">
+                      <span className="px-3 py-1.5 rounded-xl bg-red-600/20 border border-red-500/30 text-red-400 font-mono font-bold text-sm">
+                        {rate.priceDisplay}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Structured Regional Zones Grid matching the delivery rate card */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {DELIVERY_ZONES.filter((z) => selectedZoneId === 'all' || z.id === selectedZoneId).map((zone) => (
+              <div
+                key={zone.id}
+                className={`rounded-3xl border ${zone.borderColor} bg-gradient-to-b ${zone.bgColor} p-5 sm:p-6 flex flex-col justify-between space-y-5 shadow-xl hover:shadow-2xl transition-all group`}
+              >
+                <div className="space-y-4">
+                  {/* Zone Header */}
+                  <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-4">
+                    <div>
+                      <span className={`inline-block px-2.5 py-0.5 rounded-lg border text-[11px] font-bold mb-1.5 ${zone.badgeColor}`}>
+                        {zone.name}
+                      </span>
+                      <h3 className="text-lg font-black text-white group-hover:text-red-400 transition-colors">
+                        {zone.name}
+                      </h3>
+                      {zone.description && (
+                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                          {zone.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Zone Price Badge */}
+                    <div className="text-left flex-shrink-0">
+                      <span className="block text-[10px] text-slate-400 font-bold">سعر التوصيل</span>
+                      <span className="text-xl font-black text-white font-mono tracking-tight text-red-400">
+                        {zone.priceDisplay}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Cities Tags Grid */}
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block mb-2">
+                      المدن والمناطق المغطاة ({zone.cities.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {zone.cities.map((city, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-slate-200 text-xs font-semibold transition-colors"
+                        >
+                          {city}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Quick Action */}
+                <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+                  <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-semibold">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>توصيل مضمون وسريع</span>
+                  </span>
+
+                  <button
+                    onClick={() => {
+                      soundEngine.playButtonClick();
+                      setCurrentPage('products');
+                    }}
+                    className="text-slate-300 hover:text-white font-bold text-[11px] flex items-center gap-1 group/btn"
+                  >
+                    <span>طلب منتجات</span>
+                    <ArrowLeft className="w-3.5 h-3.5 group-hover/btn:-translate-x-0.5 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 5. Delivery Information & Advantages Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
+          <div className="p-5 rounded-3xl bg-[#12141f] border border-white/10 text-right space-y-2">
+            <div className="w-10 h-10 rounded-2xl bg-red-600/10 border border-red-500/20 text-red-400 flex items-center justify-center">
+              <Clock className="w-5 h-5" />
+            </div>
+            <h4 className="text-sm font-bold text-white">مواعيد وسرعة التوصيل</h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              داخل طرابلس وضواحيها خلال 24 ساعة. المنطقة الغربية والوسطى 24 - 48 ساعة. المنطقة الشرقية والجنوبية 48 - 72 ساعة.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-[#12141f] border border-white/10 text-right space-y-2">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-600/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <h4 className="text-sm font-bold text-white">تغليف احترافي وآمن</h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              جميع كروت الشاشة، الشاشات، السماعات والمعدات الحساسة يتم تغليفها بطبقات حماية مخصصة لضمان وصولها بحالة المصنع.
+            </p>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-[#12141f] border border-white/10 text-right space-y-2">
+            <div className="w-10 h-10 rounded-2xl bg-amber-600/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <h4 className="text-sm font-bold text-white">طرق دفع مرنة</h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              يمكنك الدفع كاش عند استلام الطلب من المندوب مباشرة، أو عبر خدمة التحويل المصرفي المباشر.
+            </p>
+          </div>
+        </div>
+
+        {/* 6. Direct Contact & Action Banner */}
+        <div className="rounded-3xl bg-gradient-to-r from-[#171926] via-[#1f1624] to-[#171926] border border-white/10 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-5 text-center sm:text-right shadow-2xl">
+          <div className="space-y-1.5">
+            <h3 className="text-xl sm:text-2xl font-black text-white">
+              هل لديك استفسار خاص عن التوصيل أو طلبيات الجملة؟
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-400">
+              تواصل مباشرة مع خدمة العملاء عبر واتساب وسنجيبك في ثوانٍ معدودة.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              id="delivery-rates-whatsapp-btn"
+              href={`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent('مرحباً RTG Gear X، أرغب في الاستفسار عن أسعار ومدة التوصيل لمنطقتي')}`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-emerald-950/60 transition-all cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4 fill-white" />
+              <span>استفسر عبر واتساب</span>
+            </a>
+
+            <button
+              onClick={() => {
+                soundEngine.playButtonClick();
+                setCurrentPage('products');
+              }}
+              className="px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-red-950/60 transition-all cursor-pointer"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>تصفح المنتجات</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};

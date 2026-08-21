@@ -203,7 +203,7 @@ export const PubgAccountsPage: React.FC = () => {
                           )}
                           {acc.apartmentLevel && (
                             <span className="px-2.5 py-1 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-bold">
-                              مستوى الشقة: {acc.apartmentLevel}
+                              مستوى السكي: {acc.apartmentLevel}
                             </span>
                           )}
                           {acc.hashtagsCount && (

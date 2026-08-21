@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Maximize2, ExternalLink, Video, Film, CheckCircle2, Sparkles } from 'lucide-react';
+import { Play, CheckCircle2 } from 'lucide-react';
 import { soundEngine } from '../utils/soundEngine';
 
 interface PubgVideoPlayerProps {
@@ -122,11 +122,8 @@ export const PubgVideoPlayer: React.FC<PubgVideoPlayerProps> = ({
   autoPlay = false,
   className = '',
 }) => {
-  const [isInlinePlaying, setIsInlinePlaying] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  const { type, embedUrl, rawUrl } = getEmbeddableVideoUrl(videoUrl);
-  const hasVideo = type !== 'none' && !hasError;
+  const { type } = getEmbeddableVideoUrl(videoUrl);
+  const hasVideo = type !== 'none';
 
   const defaultThumbnail = thumbnailUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80';
 
@@ -134,8 +131,6 @@ export const PubgVideoPlayer: React.FC<PubgVideoPlayerProps> = ({
     soundEngine.playButtonClick();
     if (onExpand && videoUrl) {
       onExpand(videoUrl);
-    } else if (hasVideo) {
-      setIsInlinePlaying(true);
     }
   };
 
@@ -144,43 +139,24 @@ export const PubgVideoPlayer: React.FC<PubgVideoPlayerProps> = ({
       className={`relative w-full aspect-video bg-[#0c0e17] overflow-hidden rounded-t-3xl border-b border-white/10 group cursor-pointer select-none ${className}`}
       onClick={handleCardClick}
     >
-      {/* 1. Header Badges: Level, Badge, Video Action */}
+      {/* 1. Header Badges: Level & Badge only (No top-left button) */}
       <div className="absolute top-2.5 left-2.5 right-2.5 z-20 flex items-center justify-between pointer-events-none">
-        {/* Level and Verified Badge */}
         <div className="flex items-center gap-1.5 pointer-events-auto">
           {level && (
-            <span className="px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md text-white font-mono font-bold text-[10px] sm:text-xs border border-white/10 shadow-sm">
+            <span className="px-2.5 py-0.5 rounded-lg bg-black/80 backdrop-blur-md text-white font-mono font-bold text-[10px] sm:text-xs border border-white/10 shadow-sm">
               {level}
             </span>
           )}
           {badge && (
-            <span className="px-2 py-0.5 rounded-lg bg-red-600/90 backdrop-blur-md text-white font-bold text-[10px] sm:text-xs flex items-center gap-1 shadow-sm border border-red-500/30">
+            <span className="px-2.5 py-0.5 rounded-lg bg-red-600/90 backdrop-blur-md text-white font-bold text-[10px] sm:text-xs flex items-center gap-1 shadow-sm border border-red-500/30">
               <CheckCircle2 className="w-3 h-3 text-white" />
               <span>{badge}</span>
             </span>
           )}
         </div>
-
-        {/* Video Fullscreen Action Badge */}
-        {hasVideo && (
-          <div className="flex items-center gap-1 pointer-events-auto">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleCardClick();
-              }}
-              className="px-2.5 py-1 rounded-lg bg-black/80 hover:bg-red-600 text-white backdrop-blur-md border border-white/15 transition-all text-[10px] sm:text-xs font-semibold flex items-center gap-1 shadow-md hover:scale-105 active:scale-95"
-              title="تشغيل وتكبير الفيديو"
-            >
-              <Maximize2 className="w-3 h-3 text-red-400 group-hover:text-white" />
-              <span>تشغيل الفيديو</span>
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* 2. Video Thumbnail & Interactive Play Overlay */}
+      {/* 2. Video Thumbnail & Center Play Button */}
       <div className="w-full h-full relative">
         <img
           src={defaultThumbnail}
@@ -190,33 +166,26 @@ export const PubgVideoPlayer: React.FC<PubgVideoPlayerProps> = ({
         />
 
         {/* Cinematic Gradient Vignette */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0c0e17] via-black/30 to-black/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0c0e17] via-black/25 to-black/35" />
 
-        {/* Pulsing Futuristic Play Center Button */}
+        {/* Clear & Prominent Centered Play Button */}
         {hasVideo ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+          <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative flex items-center justify-center">
               {/* Outer Radiant Glow Rings */}
-              <div className="absolute w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-600/30 animate-ping duration-1000" />
-              <div className="absolute w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500/20 blur-md" />
+              <div className="absolute w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-red-600/25 animate-ping duration-1000" />
+              <div className="absolute w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-500/30 blur-md" />
 
-              {/* Main Play Icon Button */}
-              <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-tr from-red-600 to-rose-500 text-white shadow-xl shadow-red-950/80 flex items-center justify-center border border-white/30 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
-                <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-white text-white translate-x-0.5" />
+              {/* Main Play Button - Distinct, Clear, Responsive */}
+              <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-red-600 to-rose-500 text-white shadow-2xl shadow-red-950/90 flex items-center justify-center border-2 border-white/40 group-hover:scale-110 group-active:scale-95 transition-all duration-300">
+                <Play className="w-6 h-6 sm:w-7 sm:h-7 fill-white text-white translate-x-0.5" />
               </div>
-            </div>
-
-            {/* Label Under Button */}
-            <div className="mt-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold flex items-center gap-1.5 shadow-lg group-hover:bg-red-600/90 group-hover:border-red-500/40 transition-colors">
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>اضغط لمشاهدة استعراض الحساب</span>
             </div>
           </div>
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-end p-4 text-center">
-            <div className="flex items-center gap-2 text-slate-300 text-xs bg-black/70 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-sm">
-              <Film className="w-4 h-4 text-red-500" />
-              <span>حساب موثق ومفحوص من متجر RTG</span>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="px-3.5 py-1.5 rounded-xl bg-black/80 backdrop-blur-md text-white text-xs font-bold border border-white/10">
+              حساب موثق ومفحوص
             </div>
           </div>
         )}
