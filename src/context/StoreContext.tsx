@@ -137,27 +137,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [products, setProducts] = useState<Product[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-      return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_PRODUCTS;
+      return [];
     }
   });
 
   const [pubgAccounts, setPubgAccounts] = useState<PubgAccount[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.PUBG_ACCOUNTS);
-      return saved ? JSON.parse(saved) : INITIAL_PUBG_ACCOUNTS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_PUBG_ACCOUNTS;
+      return [];
     }
   });
 
   const [allPubgAccounts, setAllPubgAccounts] = useState<PubgAccount[]>(() => {
     try {
       const saved = localStorage.getItem('rtg_all_pubg_accounts_v2');
-      return saved ? JSON.parse(saved) : INITIAL_PUBG_ACCOUNTS;
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return INITIAL_PUBG_ACCOUNTS;
+      return [];
     }
   });
 
@@ -234,19 +234,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (res.ok) {
         const data = await res.json();
         if (data && data.status === 'success') {
-          if (Array.isArray(data.products) && data.products.length > 0) {
+          if (Array.isArray(data.products)) {
             setProducts(data.products);
           }
-          if (Array.isArray(data.pubgAccounts) && data.pubgAccounts.length > 0) {
+          if (Array.isArray(data.pubgAccounts)) {
             setPubgAccounts(data.pubgAccounts);
           }
-          if (Array.isArray(data.allPubgAccounts) && data.allPubgAccounts.length > 0) {
+          if (Array.isArray(data.allPubgAccounts)) {
             setAllPubgAccounts(data.allPubgAccounts);
           }
-          if (Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
+          if (Array.isArray(data.ucPackages)) {
             setUcPackages(data.ucPackages);
           }
-          if (Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
+          if (Array.isArray(data.deliveryRates)) {
             setDeliveryRates(data.deliveryRates);
           }
           if (data.settings && typeof data.settings === 'object') {
@@ -290,14 +290,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsAppsScriptSyncing(true);
       const data = await AppsScriptService.fetchStoreData(config.webAppUrl);
 
-      if (data.products && Array.isArray(data.products) && data.products.length > 0) {
+      if (data.products && Array.isArray(data.products)) {
         setProducts(data.products);
       }
       if (data.pubgAccounts && Array.isArray(data.pubgAccounts)) {
         const normAccounts = normalizeAccounts(data.pubgAccounts);
         setPubgAccounts(normAccounts);
       }
-      if (data.allPubgAccounts && Array.isArray(data.allPubgAccounts) && data.allPubgAccounts.length > 0) {
+      if (data.allPubgAccounts && Array.isArray(data.allPubgAccounts)) {
         const normAll = normalizeAccounts(data.allPubgAccounts);
         setAllPubgAccounts(normAll);
       } else if (data.pubgAccounts && Array.isArray(data.pubgAccounts)) {
@@ -307,10 +307,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.pubgSubmissions && Array.isArray(data.pubgSubmissions)) {
         setPubgSubmissions(data.pubgSubmissions);
       }
-      if (data.ucPackages && Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
+      if (data.ucPackages && Array.isArray(data.ucPackages)) {
         setUcPackages(data.ucPackages);
       }
-      if (data.deliveryRates && Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
+      if (data.deliveryRates && Array.isArray(data.deliveryRates)) {
         setDeliveryRates(data.deliveryRates);
       }
       if (data.settings && typeof data.settings === 'object') {
@@ -325,13 +325,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          products: data.products,
+          products: data.products || [],
           pubgAccounts: normalizedAccountsForSync,
           allPubgAccounts: normalizedAllForSync,
-          ucPackages: data.ucPackages,
+          ucPackages: data.ucPackages || [],
           deliveryRates: data.deliveryRates || deliveryRates,
           settings: data.settings,
-          pubgSubmissions: data.pubgSubmissions,
+          pubgSubmissions: data.pubgSubmissions || [],
         }),
       }).catch(() => {});
     } catch (e) {
@@ -341,7 +341,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Auto-fetch on mount, interval polling (every 30s), and window/tab focus
+  // Auto-fetch on mount, interval polling (every 15s), and window/tab focus
   useEffect(() => {
     // Immediate initial sync
     fetchServerData();
@@ -350,7 +350,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Periodic sync so all visitors and devices stay updated in real time
     const interval = setInterval(() => {
       refreshFromAppsScript();
-    }, 30000);
+    }, 15000);
 
     // Refresh when user returns to tab or focuses the window
     const handleVisibilityChange = () => {
@@ -771,18 +771,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateProduct = (id: string, updated: Partial<Product>) => {
-    setProducts((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
-    );
+    const updatedList = products.map((item) => (item.id === id ? { ...item, ...updated } : item));
+    setProducts(updatedList);
 
-    // Sync state to server
-    setTimeout(() => {
-      fetch('/api/store/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products: products.map(p => p.id === id ? { ...p, ...updated } : p) }),
-      }).catch(() => {});
-    }, 100);
+    // Sync state to server immediately
+    fetch(`/api/store/product/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {});
+    fetch('/api/store/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: updatedList }),
+    }).catch(() => {});
 
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
@@ -791,10 +793,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((item) => item.id !== id));
+    const updatedList = products.filter((item) => item.id !== id);
+    setProducts(updatedList);
 
-    // Delete on server
+    // Delete on server and sync
     fetch(`/api/store/product/${id}`, { method: 'DELETE' }).catch(() => {});
+    fetch('/api/store/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: updatedList }),
+    }).catch(() => {});
 
     // Delete from Google Sheets Apps Script
     const appsScriptConfig = AppsScriptService.getConfig();
@@ -894,12 +902,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deletePubgAccount = (id: string) => {
-    setPubgAccounts((prev) => prev.filter((item) => item.id !== id));
-    setAllPubgAccounts((prev) => prev.filter((item) => item.id !== id));
+    const updatedPubg = pubgAccounts.filter((item) => item.id !== id);
+    const updatedAll = allPubgAccounts.filter((item) => item.id !== id);
+    setPubgAccounts(updatedPubg);
+    setAllPubgAccounts(updatedAll);
     setPubgSubmissions((prev) => prev.filter((s) => s.id !== id));
 
     // Delete on server
     fetch(`/api/store/pubg-account/${id}`, { method: 'DELETE' }).catch(() => {});
+    fetch('/api/store/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pubgAccounts: updatedPubg, allPubgAccounts: updatedAll }),
+    }).catch(() => {});
 
     // Delete from Google Sheets Apps Script
     const appsScriptConfig = AppsScriptService.getConfig();

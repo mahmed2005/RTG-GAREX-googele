@@ -32,11 +32,19 @@ function loadDatabase(): StoreDatabase {
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, 'utf8');
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.products) && parsed.products.length > 0) {
-        if (!parsed.deliveryRates || !Array.isArray(parsed.deliveryRates)) {
-          parsed.deliveryRates = ALL_DELIVERY_RATES;
-        }
-        return parsed;
+      if (parsed && typeof parsed === 'object') {
+        return {
+          products: Array.isArray(parsed.products) ? parsed.products : [],
+          pubgAccounts: Array.isArray(parsed.pubgAccounts) ? parsed.pubgAccounts : [],
+          allPubgAccounts: Array.isArray(parsed.allPubgAccounts) ? parsed.allPubgAccounts : (Array.isArray(parsed.pubgAccounts) ? parsed.pubgAccounts : []),
+          pubgSubmissions: Array.isArray(parsed.pubgSubmissions) ? parsed.pubgSubmissions : [],
+          ucPackages: Array.isArray(parsed.ucPackages) ? parsed.ucPackages : INITIAL_UC_PACKAGES,
+          deliveryRates: Array.isArray(parsed.deliveryRates) ? parsed.deliveryRates : ALL_DELIVERY_RATES,
+          settings: parsed.settings && typeof parsed.settings === 'object' ? { ...INITIAL_STORE_SETTINGS, ...parsed.settings } : INITIAL_STORE_SETTINGS,
+          orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+          appsScriptUrl: parsed.appsScriptUrl || '',
+          lastUpdated: parsed.lastUpdated || new Date().toISOString(),
+        };
       }
     }
   } catch (e) {
@@ -44,9 +52,9 @@ function loadDatabase(): StoreDatabase {
   }
 
   return {
-    products: INITIAL_PRODUCTS,
-    pubgAccounts: INITIAL_PUBG_ACCOUNTS,
-    allPubgAccounts: INITIAL_PUBG_ACCOUNTS,
+    products: [],
+    pubgAccounts: [],
+    allPubgAccounts: [],
     pubgSubmissions: [],
     ucPackages: INITIAL_UC_PACKAGES,
     deliveryRates: ALL_DELIVERY_RATES,
@@ -97,7 +105,7 @@ async function startServer() {
   app.post('/api/store/sync', (req, res) => {
     try {
       const { products, pubgAccounts, allPubgAccounts, ucPackages, deliveryRates, settings, pubgSubmissions } = req.body;
-      if (Array.isArray(products) && products.length > 0) {
+      if (Array.isArray(products)) {
         db.products = products;
       }
       if (Array.isArray(pubgAccounts)) {
@@ -106,10 +114,10 @@ async function startServer() {
       if (Array.isArray(allPubgAccounts)) {
         db.allPubgAccounts = allPubgAccounts;
       }
-      if (Array.isArray(ucPackages) && ucPackages.length > 0) {
+      if (Array.isArray(ucPackages)) {
         db.ucPackages = ucPackages;
       }
-      if (Array.isArray(deliveryRates) && deliveryRates.length > 0) {
+      if (Array.isArray(deliveryRates)) {
         db.deliveryRates = deliveryRates;
       }
       if (Array.isArray(pubgSubmissions)) {
@@ -120,6 +128,19 @@ async function startServer() {
       }
       saveDatabase(db);
       res.json({ status: 'success', message: 'تمت مزامنة بيانات المتجر بنجاح' });
+    } catch (e: any) {
+      res.status(500).json({ status: 'error', message: e.message });
+    }
+  });
+
+  // Update Product (PUT)
+  app.put('/api/store/product/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const updated = req.body;
+      db.products = db.products.map(p => p.id === id ? { ...p, ...updated } : p);
+      saveDatabase(db);
+      res.json({ status: 'success', message: 'Product updated' });
     } catch (e: any) {
       res.status(500).json({ status: 'error', message: e.message });
     }
