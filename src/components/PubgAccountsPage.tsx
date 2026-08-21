@@ -13,7 +13,12 @@ import {
   Flame, 
   ShoppingBag,
   Gamepad2,
-  ExternalLink 
+  ExternalLink,
+  Target,
+  Car,
+  Link2,
+  Award,
+  Crown
 } from 'lucide-react';
 
 export const PubgAccountsPage: React.FC = () => {
@@ -102,109 +107,143 @@ export const PubgAccountsPage: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-            {visibleAccounts.map((acc) => (
-              <div
-                key={acc.id}
-                id={`pubg-account-card-${acc.id}`}
-                className="bg-[#12141e] border border-white/10 hover:border-red-500/30 rounded-3xl overflow-hidden shadow-xl flex flex-col justify-between transition-all duration-300 group"
-              >
-                {/* Media Video / Player in the upper section */}
-                <PubgVideoPlayer
-                  videoUrl={acc.videoUrl}
-                  thumbnailUrl={acc.image}
-                  title={acc.title}
-                  badge={acc.badge || 'حساب موثق'}
-                  level={acc.level}
-                  onExpand={(url) => setPreviewVideoUrl(url)}
-                />
+            {visibleAccounts.map((acc) => {
+              const mythics = acc.mythicsCount || '—';
+              const weapons = acc.upgradableWeaponsCount || '—';
+              const cars = acc.carsCount || '—';
+              const linked = acc.linkedServices || acc.linkedAccounts || 'موثق';
 
-                {/* Account Content */}
-                <div className="p-6 flex-1 flex flex-col justify-between text-right">
-                  <div>
-                    <h3 className="text-lg sm:text-xl font-bold text-white mb-4">
-                      {acc.title}
-                    </h3>
+              return (
+                <div
+                  key={acc.id}
+                  id={`pubg-account-card-${acc.id}`}
+                  className="bg-[#12141e] border border-white/10 hover:border-red-500/40 rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between transition-all duration-300 group hover:shadow-red-950/20"
+                >
+                  {/* Upper Section: Video Player with Minimalist Overlay */}
+                  <PubgVideoPlayer
+                    videoUrl={acc.videoUrl}
+                    thumbnailUrl={acc.image}
+                    title={acc.title}
+                    badge={acc.badge || 'حساب موثق'}
+                    level={acc.level || (acc.accountLevel ? `LVL ${acc.accountLevel}` : undefined)}
+                    onExpand={(url) => setPreviewVideoUrl(url)}
+                  />
 
-                    {/* Detailed Specs Badges if present */}
-                    {(acc.mythicsCount || acc.goldenMythicsCount || acc.upgradableWeaponsCount || acc.carsCount || acc.linkedAccounts) && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4 p-3 rounded-2xl bg-[#161926] border border-white/5 text-[11px]">
-                        {acc.mythicsCount && (
-                          <div className="text-slate-300">
-                            <span className="text-slate-500 block text-[10px]">ميثيك عادي:</span>
-                            <span className="font-bold text-red-400">{acc.mythicsCount}</span>
-                          </div>
-                        )}
-                        {acc.goldenMythicsCount && (
-                          <div className="text-slate-300">
-                            <span className="text-slate-500 block text-[10px]">ميثيك ذهبي:</span>
-                            <span className="font-bold text-amber-400">{acc.goldenMythicsCount}</span>
-                          </div>
-                        )}
-                        {acc.upgradableWeaponsCount && (
-                          <div className="text-slate-300">
-                            <span className="text-slate-500 block text-[10px]">أسلحة مطورة:</span>
-                            <span className="font-bold text-white">{acc.upgradableWeaponsCount}</span>
-                          </div>
-                        )}
-                        {acc.carsCount && (
-                          <div className="text-slate-300">
-                            <span className="text-slate-500 block text-[10px]">سيارات:</span>
-                            <span className="font-bold text-white">{acc.carsCount}</span>
-                          </div>
-                        )}
-                        {acc.powerLevel && (
-                          <div className="text-slate-300">
-                            <span className="text-slate-500 block text-[10px]">مستوى القوة:</span>
-                            <span className="font-bold text-emerald-400 font-mono">{acc.powerLevel}</span>
-                          </div>
-                        )}
-                        {acc.linkedAccounts && (
-                          <div className="text-slate-300">
-                            <span className="text-slate-500 block text-[10px]">الربط:</span>
-                            <span className="font-bold text-slate-300 truncate block">{acc.linkedAccounts}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Features tags grid */}
-                    <div className="grid grid-cols-2 gap-2 mb-6">
-                      {(acc.features || []).map((feat, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2 p-2 rounded-xl bg-[#171a26] border border-white/5 text-[11px] sm:text-xs text-slate-300"
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
-                          <span className="truncate">{feat}</span>
+                  {/* Lower Section: Organized Gaming Specs & Pricing */}
+                  <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between text-right">
+                    <div>
+                      {/* Account Title Header */}
+                      <div className="flex items-center justify-between gap-2 mb-4">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <h3 className="text-lg sm:text-xl font-black text-white tracking-wide">
+                            {acc.title}
+                          </h3>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        <span className="text-[11px] font-bold text-slate-400 bg-white/5 px-2.5 py-1 rounded-xl border border-white/5">
+                          {acc.ownerName || 'متجر RTG'}
+                        </span>
+                      </div>
 
-                  {/* Price & Action */}
-                  <div className="pt-4 border-t border-white/10 flex items-center justify-between">
-                    <div className="text-right">
-                      <span className="text-[11px] text-slate-400 block">السعر</span>
-                      <span className="text-2xl font-black text-red-500 font-mono">
-                        {acc.price.toLocaleString()} د.ل
-                      </span>
+                      {/* Organized 4-Grid Specs (Flame / Target / Car / Link) */}
+                      <div className="grid grid-cols-2 gap-2.5 mb-5">
+                        {/* 1. Mythics */}
+                        <div className="p-3 rounded-2xl bg-[#171a27] border border-white/5 hover:border-red-500/30 transition-colors flex items-center justify-between">
+                          <div className="w-8 h-8 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                            <Flame className="w-4 h-4" />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-400 block font-medium">الميثيك</span>
+                            <span className="text-sm font-black text-red-400 font-mono">{mythics}</span>
+                          </div>
+                        </div>
+
+                        {/* 2. Upgradable Weapons */}
+                        <div className="p-3 rounded-2xl bg-[#171a27] border border-white/5 hover:border-blue-500/30 transition-colors flex items-center justify-between">
+                          <div className="w-8 h-8 rounded-xl bg-blue-600/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                            <Target className="w-4 h-4" />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-400 block font-medium">أسلحة مطورة</span>
+                            <span className="text-sm font-black text-white font-mono">{weapons}</span>
+                          </div>
+                        </div>
+
+                        {/* 3. Cars */}
+                        <div className="p-3 rounded-2xl bg-[#171a27] border border-white/5 hover:border-amber-500/30 transition-colors flex items-center justify-between">
+                          <div className="w-8 h-8 rounded-xl bg-amber-600/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                            <Car className="w-4 h-4" />
+                          </div>
+                          <div className="text-left">
+                            <span className="text-[10px] text-slate-400 block font-medium">السيارات</span>
+                            <span className="text-sm font-black text-amber-400 font-mono">{cars}</span>
+                          </div>
+                        </div>
+
+                        {/* 4. Linked Account */}
+                        <div className="p-3 rounded-2xl bg-[#171a27] border border-white/5 hover:border-emerald-500/30 transition-colors flex items-center justify-between">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-600/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                            <Link2 className="w-4 h-4" />
+                          </div>
+                          <div className="text-left max-w-[90px] truncate">
+                            <span className="text-[10px] text-slate-400 block font-medium">الربط</span>
+                            <span className="text-xs font-bold text-emerald-300 truncate block">{linked}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Optional Secondary Highlights (Golden Mythic, Apartment, Rating) if available */}
+                      {(acc.goldCount || acc.goldenMythicsCount || acc.apartmentLevel || acc.hashtagsCount) && (
+                        <div className="flex items-center gap-2 flex-wrap mb-4">
+                          {(acc.goldCount || acc.goldenMythicsCount) && (
+                            <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] font-bold flex items-center gap-1">
+                              <Crown className="w-3 h-3 text-amber-400" />
+                              <span>ميثيك ذهبي: {acc.goldCount || acc.goldenMythicsCount}</span>
+                            </span>
+                          )}
+                          {acc.apartmentLevel && (
+                            <span className="px-2.5 py-1 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-bold">
+                              مستوى الشقة: {acc.apartmentLevel}
+                            </span>
+                          )}
+                          {acc.hashtagsCount && (
+                            <span className="px-2.5 py-1 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-[11px] font-bold flex items-center gap-1">
+                              <Award className="w-3 h-3 text-cyan-400" />
+                              <span>الألقاب: {acc.hashtagsCount}</span>
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <button
-                      id={`buy-account-btn-${acc.id}`}
-                      onClick={() => {
-                        soundEngine.playButtonClick();
-                        setSelectedAccountForBuy(acc);
-                      }}
-                      className="px-6 py-3 bg-red-600 hover:bg-red-500 active:scale-95 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-red-950/60 transition-all flex items-center gap-2"
-                    >
-                      <ShoppingBag className="w-4 h-4" />
-                      <span>شراء الحساب</span>
-                    </button>
+                    {/* Price & Action Section */}
+                    <div className="pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block font-semibold">سعر الحساب</span>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-black text-red-500 font-mono tracking-tight">
+                            {acc.price.toLocaleString()}
+                          </span>
+                          <span className="text-xs font-bold text-slate-300">د.ل</span>
+                        </div>
+                      </div>
+
+                      <button
+                        id={`buy-account-btn-${acc.id}`}
+                        onClick={() => {
+                          soundEngine.playButtonClick();
+                          setSelectedAccountForBuy(acc);
+                        }}
+                        className="px-6 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-red-950/60 transition-all flex items-center gap-2"
+                      >
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>شراء الحساب</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
