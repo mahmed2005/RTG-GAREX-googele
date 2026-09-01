@@ -592,10 +592,10 @@ function getProductColumnMap(pSheet) {
     price: 3,
     oldPrice: 4,
     image: 5,
-    description: 6,
-    inStock: 7,
-    featured: 8,
-    tag: -1
+    tag: 6,
+    description: 7,
+    inStock: 8,
+    featured: 9
   };
 
   if (!pSheet) return map;
@@ -838,7 +838,7 @@ function setupSheetsIfMissing(ss) {
   var requiredSheets = [
     {
       name: 'المنتجات',
-      headers: ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)']
+      headers: ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الشارة (Tag)', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)']
     },
     {
       name: 'حسابات ببجي',
@@ -948,8 +948,8 @@ function createJsonResponse(data) {
 }
 `;
 
-export const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxO0mCyl7uJx1EhxtWUBfR86pSRGKL-oVByHfKBA3TSfKhKZt-D8nWKTSMS_1poz7VsA/exec';
-export const DEFAULT_DEV_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwxO0mCyl7uJx1EhxtWUBfR86pSRGKL-oVByHfKBA3TSfKhKZt-D8nWKTSMS_1poz7VsA/exec';
+export const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLT7CH_DtGvX63okgIsf-PqWLTgxJk9y2lwtxiv3WWhfT0PQwLB9n-647sg0d5SKSeOA/exec';
+export const DEFAULT_DEV_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLT7CH_DtGvX63okgIsf-PqWLTgxJk9y2lwtxiv3WWhfT0PQwLB9n-647sg0d5SKSeOA/exec';
 
 export class AppsScriptService {
   public static getConfig(): AppsScriptConfig {
@@ -958,6 +958,11 @@ export class AppsScriptService {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.webAppUrl && parsed.webAppUrl.trim()) {
+          // If stored URL was the old default, upgrade to current default
+          if (parsed.webAppUrl.includes('AKfycbwxO0mCyl7uJx1EhxtWUBfR86pSRGKL')) {
+            parsed.webAppUrl = DEFAULT_APPS_SCRIPT_URL;
+            localStorage.setItem(APPS_SCRIPT_CONFIG_KEY, JSON.stringify(parsed));
+          }
           return parsed;
         }
       }

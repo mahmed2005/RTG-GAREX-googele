@@ -200,7 +200,7 @@ export class GoogleSheetsService {
     }
   ): Promise<void> {
     // 1. Products Sheet data
-    const productsHeader = ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)'];
+    const productsHeader = ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الشارة (Tag)', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)'];
     const productsRows = data.products.map((p) => [
       p.id,
       p.name,
@@ -208,6 +208,7 @@ export class GoogleSheetsService {
       p.price,
       p.oldPrice || '',
       p.image,
+      p.tag || '',
       p.description || '',
       p.inStock ? 'نعم' : 'لا',
       p.featured ? 'نعم' : 'لا',
