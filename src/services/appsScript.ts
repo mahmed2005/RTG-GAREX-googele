@@ -252,18 +252,22 @@ function doPost(e) {
         }
       }
 
-      pSheet.appendRow([
-        prodId,
-        p.name || '',
-        p.category || 'الكل',
-        Number(p.price) || 0,
-        p.oldPrice ? Number(p.oldPrice) : '',
-        prodImage,
-        p.tag || '',
-        p.description || '',
-        p.inStock !== false ? 'نعم' : 'لا',
-        p.featured ? 'نعم' : 'لا'
-      ]);
+      var colMap = getProductColumnMap(pSheet);
+      var lastCol = Math.max(pSheet.getLastColumn(), 9);
+      var newRow = new Array(lastCol).fill('');
+
+      newRow[colMap.id] = prodId;
+      newRow[colMap.name] = p.name || '';
+      newRow[colMap.category] = p.category || 'الكل';
+      newRow[colMap.price] = Number(p.price) || 0;
+      newRow[colMap.oldPrice] = p.oldPrice ? Number(p.oldPrice) : '';
+      newRow[colMap.image] = prodImage;
+      newRow[colMap.description] = p.description || '';
+      newRow[colMap.inStock] = p.inStock !== false ? 'نعم' : 'لا';
+      newRow[colMap.featured] = p.featured ? 'نعم' : 'لا';
+      if (colMap.tag !== -1) newRow[colMap.tag] = p.tag || '';
+
+      pSheet.appendRow(newRow);
 
       return createJsonResponse({ status: 'success', message: 'تمت إضافة المنتج بنجاح', id: prodId, image: prodImage });
     }
@@ -284,7 +288,10 @@ function doPost(e) {
       }
 
       if (pFound > 0) {
-        var rowImage = upProd.image || pData[pFound-1][5];
+        var colMap = getProductColumnMap(sheetP);
+        var existingRow = pData[pFound - 1];
+        var rowImage = upProd.image || existingRow[colMap.image] || '';
+
         if (upProd.imageBase64 && upProd.imageBase64.length > 20) {
           try {
             var newImg = saveFileToGoogleDrive(upProd.imageBase64, 'prod_' + upProdId + '.jpg', 'image/jpeg');
@@ -292,18 +299,22 @@ function doPost(e) {
           } catch(e){}
         }
 
-        var newPRow = [
-          upProdId,
-          upProd.name || pData[pFound-1][1],
-          upProd.category || pData[pFound-1][2],
-          upProd.price !== undefined ? Number(upProd.price) : pData[pFound-1][3],
-          upProd.oldPrice !== undefined ? Number(upProd.oldPrice) : pData[pFound-1][4],
-          rowImage,
-          upProd.tag !== undefined ? upProd.tag : pData[pFound-1][6],
-          upProd.description !== undefined ? upProd.description : pData[pFound-1][7],
-          upProd.inStock !== undefined ? (upProd.inStock ? 'نعم' : 'لا') : pData[pFound-1][8],
-          upProd.featured !== undefined ? (upProd.featured ? 'نعم' : 'لا') : pData[pFound-1][9]
-        ];
+        var newPRow = existingRow.slice();
+        while (newPRow.length < Math.max(sheetP.getLastColumn(), 9)) {
+          newPRow.push('');
+        }
+
+        newPRow[colMap.id] = upProdId;
+        if (upProd.name !== undefined) newPRow[colMap.name] = upProd.name;
+        if (upProd.category !== undefined) newPRow[colMap.category] = upProd.category;
+        if (upProd.price !== undefined) newPRow[colMap.price] = Number(upProd.price);
+        if (upProd.oldPrice !== undefined) newPRow[colMap.oldPrice] = upProd.oldPrice ? Number(upProd.oldPrice) : '';
+        newPRow[colMap.image] = rowImage;
+        if (upProd.description !== undefined) newPRow[colMap.description] = upProd.description;
+        if (upProd.inStock !== undefined) newPRow[colMap.inStock] = upProd.inStock ? 'نعم' : 'لا';
+        if (upProd.featured !== undefined) newPRow[colMap.featured] = upProd.featured ? 'نعم' : 'لا';
+        if (colMap.tag !== -1 && upProd.tag !== undefined) newPRow[colMap.tag] = upProd.tag;
+
         sheetP.getRange(pFound, 1, 1, newPRow.length).setValues([newPRow]);
         return createJsonResponse({ status: 'success', message: 'تم تحديث بيانات المنتج بنجاح' });
       }
@@ -572,27 +583,73 @@ function saveFileToGoogleDrive(base64Data, fileName, mimeType) {
   };
 }
 
+// دالة تحديد وتعيين أعمدة ورقة المنتجات بذكاء وديناميكية لتفادي أي إزاحة في الأعمدة
+function getProductColumnMap(pSheet) {
+  var map = {
+    id: 0,
+    name: 1,
+    category: 2,
+    price: 3,
+    oldPrice: 4,
+    image: 5,
+    description: 6,
+    inStock: 7,
+    featured: 8,
+    tag: -1
+  };
+
+  if (!pSheet) return map;
+  var lastCol = pSheet.getLastColumn();
+  if (lastCol < 1) return map;
+  
+  var headers = pSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  for (var c = 0; c < headers.length; c++) {
+    var h = String(headers[c] || '').trim().toLowerCase();
+    if (!h) continue;
+    if (h.indexOf('معرف') > -1 || h.indexOf('id') > -1) map.id = c;
+    else if (h.indexOf('اسم') > -1 || h.indexOf('name') > -1) map.name = c;
+    else if (h.indexOf('تصنيف') > -1 || h.indexOf('فئة') > -1 || h.indexOf('category') > -1) map.category = c;
+    else if (h.indexOf('قديم') > -1 || h.indexOf('old') > -1 || h.indexOf('مخفض') > -1) map.oldPrice = c;
+    else if (h.indexOf('سعر') > -1 || h.indexOf('price') > -1) map.price = c;
+    else if (h.indexOf('صورة') > -1 || h.indexOf('image') > -1) map.image = c;
+    else if (h.indexOf('شارة') > -1 || h.indexOf('tag') > -1) map.tag = c;
+    else if (h.indexOf('وصف') > -1 || h.indexOf('desc') > -1) map.description = c;
+    else if (h.indexOf('متوفر') > -1 || h.indexOf('مخزن') > -1 || h.indexOf('stock') > -1) map.inStock = c;
+    else if (h.indexOf('مميز') > -1 || h.indexOf('featured') > -1) map.featured = c;
+  }
+  return map;
+}
+
 // دالة جلب كافة بيانات المتجر وصفحات التواصل من Google Sheets
 function getAllStoreData(ss) {
   // 1. المنتجات
   var prodSheet = ss.getSheetByName('المنتجات');
-  var prodData = prodSheet.getDataRange().getValues();
+  var prodData = prodSheet ? prodSheet.getDataRange().getValues() : [];
   var products = [];
-  for (var i = 1; i < prodData.length; i++) {
-    var r = prodData[i];
-    if (r[0] && r[1]) {
-      products.push({
-        id: String(r[0]),
-        name: String(r[1]),
-        category: String(r[2]),
-        price: Number(r[3]) || 0,
-        oldPrice: r[4] ? Number(r[4]) : undefined,
-        image: String(r[5] || ''),
-        tag: r[6] ? String(r[6]) : undefined,
-        description: String(r[7] || ''),
-        inStock: r[8] === 'لا' ? false : true,
-        featured: r[9] === 'نعم' ? true : false
-      });
+
+  if (prodData.length > 1) {
+    var colMap = getProductColumnMap(prodSheet);
+    for (var i = 1; i < prodData.length; i++) {
+      var r = prodData[i];
+      var pid = r[colMap.id];
+      var pname = r[colMap.name];
+      if (pid && pname) {
+        var inStockVal = String(r[colMap.inStock] !== undefined ? r[colMap.inStock] : 'نعم').trim();
+        var featuredVal = String(r[colMap.featured] !== undefined ? r[colMap.featured] : 'لا').trim();
+
+        products.push({
+          id: String(pid),
+          name: String(pname),
+          category: String(r[colMap.category] || 'الكل'),
+          price: Number(r[colMap.price]) || 0,
+          oldPrice: r[colMap.oldPrice] ? Number(r[colMap.oldPrice]) : undefined,
+          image: String(r[colMap.image] || ''),
+          description: String(r[colMap.description] || ''),
+          inStock: inStockVal === 'لا' ? false : true,
+          featured: featuredVal === 'نعم' ? true : false,
+          tag: colMap.tag !== -1 && r[colMap.tag] ? String(r[colMap.tag]) : undefined
+        });
+      }
     }
   }
 
@@ -781,7 +838,7 @@ function setupSheetsIfMissing(ss) {
   var requiredSheets = [
     {
       name: 'المنتجات',
-      headers: ['المعرف (ID)', 'اسم المنتج', 'فئة المنتج', 'سعر المنتج (د.ل)', 'السعر الخاص/المخفض', 'رابط صورة المنتج', 'الشارة (Tag)', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)']
+      headers: ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)']
     },
     {
       name: 'حسابات ببجي',

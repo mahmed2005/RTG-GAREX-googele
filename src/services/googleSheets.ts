@@ -200,16 +200,17 @@ export class GoogleSheetsService {
     }
   ): Promise<void> {
     // 1. Products Sheet data
-    const productsHeader = ['المعرف (ID)', 'اسم المنتج', 'الفئة', 'السعر (د.ل)', 'السعر القديم', 'الحالة', 'رابط الصورة', 'الوصف'];
+    const productsHeader = ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)'];
     const productsRows = data.products.map((p) => [
       p.id,
       p.name,
       p.category,
       p.price,
       p.oldPrice || '',
-      p.inStock ? 'متوفر' : 'غير متوفر',
       p.image,
       p.description || '',
+      p.inStock ? 'نعم' : 'لا',
+      p.featured ? 'نعم' : 'لا',
     ]);
 
     // 2. PUBG Accounts data
