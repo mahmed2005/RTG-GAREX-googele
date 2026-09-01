@@ -12,7 +12,7 @@ import {
   INITIAL_STORE_SETTINGS 
 } from '../data/initialData';
 
-export type PageType = 'home' | 'products' | 'pubg_accounts' | 'pubg_uc' | 'delivery_rates' | 'contact' | 'admin';
+export type PageType = 'home' | 'products' | 'product_detail' | 'pubg_accounts' | 'pubg_uc' | 'delivery_rates' | 'contact' | 'admin';
 
 interface StoreContextType {
   // Navigation
@@ -20,6 +20,9 @@ interface StoreContextType {
   setCurrentPage: (page: PageType) => void;
   selectedCategory: string;
   setSelectedCategory: (category: string) => void;
+  selectedProduct: Product | null;
+  setSelectedProduct: (product: Product | null) => void;
+  openProductDetails: (product: Product) => void;
   
   // Data
   products: Product[];
@@ -172,6 +175,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   const [cities] = useState<LibyanCity[]>(LIBYAN_CITIES);
+
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(() =>
+    safeStorage.getItem<Product | null>('rtg_selected_product_v1', null)
+  );
+
+  const openProductDetails = (product: Product) => {
+    setSelectedProduct(product);
+    safeStorage.setItem('rtg_selected_product_v1', product);
+    setCurrentPage('product_detail');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Modals state
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -1087,6 +1101,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setCurrentPage,
         selectedCategory,
         setSelectedCategory,
+        selectedProduct,
+        setSelectedProduct,
+        openProductDetails,
         products,
         pubgAccounts,
         ucPackages,

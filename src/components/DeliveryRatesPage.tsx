@@ -97,7 +97,7 @@ export const DeliveryRatesPage: React.FC = () => {
                 <option value="">-- اضغط لاختيار المدينة أو المنطقة --</option>
                 {deliveryRates.map((rate) => (
                   <option key={rate.id} value={rate.id}>
-                    📍 {rate.name} ({rate.zoneName}) - {rate.priceDisplay}
+                    📍 {rate.name} ({rate.zoneName})
                   </option>
                 ))}
               </select>

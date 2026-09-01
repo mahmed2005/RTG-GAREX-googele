@@ -8,6 +8,7 @@ import { FeaturesSection } from './components/FeaturesSection';
 import { LatestProducts } from './components/LatestProducts';
 import { DirectOrderBanner } from './components/DirectOrderBanner';
 import { ProductsPage } from './components/ProductsPage';
+import { ProductDetailsPage } from './components/ProductDetailsPage';
 import { PubgAccountsPage } from './components/PubgAccountsPage';
 import { PubgUcPage } from './components/PubgUcPage';
 import { DeliveryRatesPage } from './components/DeliveryRatesPage';
@@ -91,6 +92,7 @@ const AppContent: React.FC = () => {
             )}
 
             {currentPage === 'products' && <ProductsPage />}
+            {currentPage === 'product_detail' && <ProductDetailsPage />}
             {currentPage === 'pubg_accounts' && <PubgAccountsPage />}
             {currentPage === 'pubg_uc' && <PubgUcPage />}
             {currentPage === 'delivery_rates' && <DeliveryRatesPage />}
