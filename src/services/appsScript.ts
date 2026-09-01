@@ -169,6 +169,71 @@ function doPost(e) {
       return createJsonResponse({ status: 'success', message: 'تم تنفيذ الحذف بنجاح' });
     }
 
+    // 3.5. تعديل حساب ببجي
+    if (action === 'update_pubg_account') {
+      var upAcc = payload.data || payload;
+      var upAccId = String(payload.id || upAcc.id || '').trim();
+      var sheetA = ss.getSheetByName('حسابات ببجي');
+      var aData = sheetA.getDataRange().getValues();
+      var aFound = -1;
+
+      for (var ai = 1; ai < aData.length; ai++) {
+        if (String(aData[ai][0]).trim() === upAccId || (upAccId && String(aData[ai][2]).trim() === upAccId)) {
+          aFound = ai + 1;
+          break;
+        }
+      }
+
+      var videoFinal = upAcc.videoUrl !== undefined ? upAcc.videoUrl : (aFound > 0 ? aData[aFound-1][15] : '');
+
+      if (aFound > 0) {
+        var updatedARow = [
+          upAccId,
+          upAcc.ownerName !== undefined ? upAcc.ownerName : aData[aFound-1][1],
+          upAcc.accountName !== undefined ? upAcc.accountName : (upAcc.title || aData[aFound-1][2]),
+          upAcc.accountLevel !== undefined ? upAcc.accountLevel : (upAcc.level || aData[aFound-1][3]),
+          upAcc.mythicsCount !== undefined ? upAcc.mythicsCount : aData[aFound-1][4],
+          upAcc.apartmentLevel !== undefined ? upAcc.apartmentLevel : aData[aFound-1][5],
+          upAcc.goldCount !== undefined ? upAcc.goldCount : aData[aFound-1][6],
+          upAcc.upgradableWeaponsCount !== undefined ? upAcc.upgradableWeaponsCount : (upAcc.upgradableWeapons || aData[aFound-1][7]),
+          upAcc.carsCount !== undefined ? upAcc.carsCount : aData[aFound-1][8],
+          upAcc.hashtagsCount !== undefined ? upAcc.hashtagsCount : aData[aFound-1][9],
+          upAcc.linkedServices !== undefined ? upAcc.linkedServices : (upAcc.linkedAccounts || aData[aFound-1][10]),
+          upAcc.salePrice !== undefined ? upAcc.salePrice : (upAcc.price || aData[aFound-1][11]),
+          upAcc.sellerPhone !== undefined ? upAcc.sellerPhone : aData[aFound-1][12],
+          upAcc.transferPhone !== undefined ? upAcc.transferPhone : aData[aFound-1][13],
+          upAcc.storeReceivePhone !== undefined ? upAcc.storeReceivePhone : aData[aFound-1][14],
+          videoFinal,
+          upAcc.siteRating !== undefined ? upAcc.siteRating : aData[aFound-1][16],
+          upAcc.displayOnSite !== undefined ? upAcc.displayOnSite : aData[aFound-1][17]
+        ];
+        sheetA.getRange(aFound, 1, 1, updatedARow.length).setValues([updatedARow]);
+        return createJsonResponse({ status: 'success', message: 'تم تحديث بيانات حساب PUBG بنجاح' });
+      } else {
+        sheetA.appendRow([
+          upAccId,
+          upAcc.ownerName || '',
+          upAcc.accountName || upAcc.title || '',
+          upAcc.accountLevel || upAcc.level || '',
+          upAcc.mythicsCount || '0',
+          upAcc.apartmentLevel || '',
+          upAcc.goldCount || '',
+          upAcc.upgradableWeaponsCount || upAcc.upgradableWeapons || '',
+          upAcc.carsCount || '0',
+          upAcc.hashtagsCount || '0',
+          upAcc.linkedServices || upAcc.linkedAccounts || '',
+          upAcc.salePrice || upAcc.price || '0',
+          upAcc.sellerPhone || '',
+          upAcc.transferPhone || '',
+          upAcc.storeReceivePhone || '0943981577',
+          videoFinal,
+          upAcc.siteRating || '5',
+          upAcc.displayOnSite || 'نعم'
+        ]);
+        return createJsonResponse({ status: 'success', message: 'تم حفظ حساب PUBG بنجاح' });
+      }
+    }
+
     // 4. إضافة منتج جديد
     if (action === 'add_product') {
       var p = payload.data || payload;
@@ -865,10 +930,23 @@ export class AppsScriptService {
    */
   private static async sendPost(webAppUrl: string, body: any): Promise<any> {
     const targetUrl = webAppUrl && webAppUrl.trim() ? webAppUrl.trim() : DEFAULT_APPS_SCRIPT_URL;
-    const cleanUrl = targetUrl;
 
+    // 1. Try server-side proxy first (100% reliable, zero CORS restrictions on mobile/desktop)
     try {
-      const res = await fetch(cleanUrl, {
+      const proxyRes = await fetch('/api/apps-script-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: targetUrl, payload: body }),
+      });
+      if (proxyRes.ok) {
+        const proxyData = await proxyRes.json();
+        return proxyData;
+      }
+    } catch {}
+
+    // 2. Direct fetch fallback
+    try {
+      const res = await fetch(targetUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -884,9 +962,9 @@ export class AppsScriptService {
         }
       }
     } catch (e) {
-      // Fallback no-cors
+      // 3. Fallback no-cors
       try {
-        await fetch(cleanUrl, {
+        await fetch(targetUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: {

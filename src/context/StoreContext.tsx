@@ -3,6 +3,7 @@ import { Product, PubgAccount, UcPackage, CartItem, Order, StoreSettings, Libyan
 import { GoogleSheetsService } from '../services/googleSheets';
 import { AppsScriptService } from '../services/appsScript';
 import { ALL_DELIVERY_RATES } from '../data/deliveryData';
+import { safeStorage } from '../utils/safeStorage';
 import { 
   INITIAL_PRODUCTS, 
   INITIAL_PUBG_ACCOUNTS, 
@@ -134,86 +135,41 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
 
   // Persistence State
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [products, setProducts] = useState<Product[]>(() => 
+    safeStorage.getItem<Product[]>(STORAGE_KEYS.PRODUCTS, [])
+  );
 
-  const [pubgAccounts, setPubgAccounts] = useState<PubgAccount[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.PUBG_ACCOUNTS);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [pubgAccounts, setPubgAccounts] = useState<PubgAccount[]>(() => 
+    safeStorage.getItem<PubgAccount[]>(STORAGE_KEYS.PUBG_ACCOUNTS, [])
+  );
 
-  const [allPubgAccounts, setAllPubgAccounts] = useState<PubgAccount[]>(() => {
-    try {
-      const saved = localStorage.getItem('rtg_all_pubg_accounts_v2');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [allPubgAccounts, setAllPubgAccounts] = useState<PubgAccount[]>(() => 
+    safeStorage.getItem<PubgAccount[]>('rtg_all_pubg_accounts_v2', [])
+  );
 
-  const [ucPackages, setUcPackages] = useState<UcPackage[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.UC_PACKAGES);
-      return saved ? JSON.parse(saved) : INITIAL_UC_PACKAGES;
-    } catch {
-      return INITIAL_UC_PACKAGES;
-    }
-  });
+  const [ucPackages, setUcPackages] = useState<UcPackage[]>(() => 
+    safeStorage.getItem<UcPackage[]>(STORAGE_KEYS.UC_PACKAGES, INITIAL_UC_PACKAGES)
+  );
 
-  const [deliveryRates, setDeliveryRates] = useState<DeliveryCityRate[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.DELIVERY_RATES);
-      return saved ? JSON.parse(saved) : ALL_DELIVERY_RATES;
-    } catch {
-      return ALL_DELIVERY_RATES;
-    }
-  });
+  const [deliveryRates, setDeliveryRates] = useState<DeliveryCityRate[]>(() => 
+    safeStorage.getItem<DeliveryCityRate[]>(STORAGE_KEYS.DELIVERY_RATES, ALL_DELIVERY_RATES)
+  );
 
-  const [settings, setSettings] = useState<StoreSettings>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      return saved ? JSON.parse(saved) : INITIAL_STORE_SETTINGS;
-    } catch {
-      return INITIAL_STORE_SETTINGS;
-    }
-  });
+  const [settings, setSettings] = useState<StoreSettings>(() => 
+    safeStorage.getItem<StoreSettings>(STORAGE_KEYS.SETTINGS, INITIAL_STORE_SETTINGS)
+  );
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.ORDERS);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [orders, setOrders] = useState<Order[]>(() => 
+    safeStorage.getItem<Order[]>(STORAGE_KEYS.ORDERS, [])
+  );
 
-  const [pubgSubmissions, setPubgSubmissions] = useState<PubgSellSubmission[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.PUBG_SUBMISSIONS);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [pubgSubmissions, setPubgSubmissions] = useState<PubgSellSubmission[]>(() => 
+    safeStorage.getItem<PubgSellSubmission[]>(STORAGE_KEYS.PUBG_SUBMISSIONS, [])
+  );
 
-  const [cart, setCart] = useState<CartItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CART);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [cart, setCart] = useState<CartItem[]>(() => 
+    safeStorage.getItem<CartItem[]>(STORAGE_KEYS.CART, [])
+  );
 
   const [cities] = useState<LibyanCity[]>(LIBYAN_CITIES);
 
@@ -369,41 +325,41 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // Sync to local storage
+  // Sync to local storage safely
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+    safeStorage.setItem(STORAGE_KEYS.PRODUCTS, products);
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PUBG_ACCOUNTS, JSON.stringify(pubgAccounts));
+    safeStorage.setItem(STORAGE_KEYS.PUBG_ACCOUNTS, pubgAccounts);
   }, [pubgAccounts]);
 
   useEffect(() => {
-    localStorage.setItem('rtg_all_pubg_accounts_v2', JSON.stringify(allPubgAccounts));
+    safeStorage.setItem('rtg_all_pubg_accounts_v2', allPubgAccounts);
   }, [allPubgAccounts]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.UC_PACKAGES, JSON.stringify(ucPackages));
+    safeStorage.setItem(STORAGE_KEYS.UC_PACKAGES, ucPackages);
   }, [ucPackages]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    safeStorage.setItem(STORAGE_KEYS.SETTINGS, settings);
   }, [settings]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+    safeStorage.setItem(STORAGE_KEYS.ORDERS, orders);
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PUBG_SUBMISSIONS, JSON.stringify(pubgSubmissions));
+    safeStorage.setItem(STORAGE_KEYS.PUBG_SUBMISSIONS, pubgSubmissions);
   }, [pubgSubmissions]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.DELIVERY_RATES, JSON.stringify(deliveryRates));
+    safeStorage.setItem(STORAGE_KEYS.DELIVERY_RATES, deliveryRates);
   }, [deliveryRates]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cart));
+    safeStorage.setItem(STORAGE_KEYS.CART, cart);
   }, [cart]);
 
   // Cart operations
@@ -818,8 +774,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       id: `acc-${Date.now()}`,
       approved: true,
       status: 'approved',
+      displayOnSite: 'نعم',
+      isAvailable: true,
     };
-    setPubgAccounts((prev) => [newAccount, ...prev]);
+    const updatedPubg = [newAccount, ...pubgAccounts];
+    const updatedAll = [newAccount, ...allPubgAccounts];
+    setPubgAccounts(updatedPubg);
+    setAllPubgAccounts(updatedAll);
 
     // Save to server
     fetch('/api/store/pubg-account', {
@@ -827,20 +788,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newAccount),
     }).catch(() => {});
+    fetch('/api/store/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pubgAccounts: updatedPubg, allPubgAccounts: updatedAll }),
+    }).catch(() => {});
 
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
-      AppsScriptService.syncAllData(appsScriptConfig.webAppUrl, {
-        products,
-        pubgAccounts: [newAccount, ...pubgAccounts],
+      AppsScriptService.submitPubgSellAccount(appsScriptConfig.webAppUrl, {
+        ...newAccount,
+        displayOnSite: 'نعم',
       }).catch(console.error);
     }
   };
 
   const updatePubgAccount = (id: string, updated: Partial<PubgAccount>) => {
-    setPubgAccounts((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
-    );
+    const updatedAll = allPubgAccounts.map((item) => (item.id === id ? { ...item, ...updated } : item));
+    const updatedPubg = pubgAccounts.map((item) => (item.id === id ? { ...item, ...updated } : item));
+    setAllPubgAccounts(updatedAll);
+    setPubgAccounts(updatedPubg);
+
+    // Sync to server
+    fetch('/api/store/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pubgAccounts: updatedPubg, allPubgAccounts: updatedAll }),
+    }).catch(() => {});
 
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
@@ -945,9 +919,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const updateUcPackage = (id: string, updated: Partial<UcPackage>) => {
-    setUcPackages((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
-    );
+    const updatedList = ucPackages.map((item) => (item.id === id ? { ...item, ...updated } : item));
+    setUcPackages(updatedList);
+
+    // Sync to server
+    fetch('/api/store/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ucPackages: updatedList }),
+    }).catch(() => {});
 
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
@@ -956,10 +936,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteUcPackage = (id: string) => {
-    setUcPackages((prev) => prev.filter((item) => item.id !== id));
+    const updatedList = ucPackages.filter((item) => item.id !== id);
+    setUcPackages(updatedList);
 
     // Delete on server
     fetch(`/api/store/uc-package/${id}`, { method: 'DELETE' }).catch(() => {});
+    fetch('/api/store/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ucPackages: updatedList }),
+    }).catch(() => {});
 
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {

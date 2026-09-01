@@ -3,6 +3,7 @@ import { useStore } from '../context/StoreContext';
 import { Product, PubgAccount, UcPackage, Category } from '../types';
 import { AppsScriptService, AppsScriptConfig, GOOGLE_APPS_SCRIPT_TEMPLATE } from '../services/appsScript';
 import { DeliveryRatesAdmin } from './DeliveryRatesAdmin';
+import { compressImage } from '../utils/imageCompressor';
 import { 
   Gamepad2, 
   UserCheck, 
@@ -288,18 +289,36 @@ export const AdminDashboard: React.FC = () => {
     showToast('success', 'تمت إضافة المنتج وحفظه في Google Sheet بنجاح!');
   };
 
-  // Image Upload Handler for Products
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image Upload Handler for Products (Add)
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      try {
+        const compressedBase64 = await compressImage(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.82 });
         setProductForm((prev) => ({
           ...prev,
-          imageBase64: reader.result as string,
+          imageBase64: compressedBase64,
+          image: prev.image || compressedBase64,
         }));
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error compressing image:', err);
+      }
+    }
+  };
+
+  // Image Upload Handler for Products (Edit)
+  const handleEditImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && editingProduct) {
+      try {
+        const compressedBase64 = await compressImage(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.82 });
+        setEditingProduct((prev) => prev ? ({
+          ...prev,
+          image: compressedBase64,
+        }) : null);
+      } catch (err) {
+        console.error('Error compressing edit image:', err);
+      }
     }
   };
 
@@ -1753,13 +1772,35 @@ export const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">رابط صورة المنتج (URL)</label>
-                    <input
-                      type="url"
-                      value={editingProduct.image}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
-                    />
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">صورة المنتج</label>
+                    <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                      {editingProduct.image && (
+                        <div className="w-16 h-16 rounded-xl bg-black/40 border border-white/10 overflow-hidden flex-shrink-0">
+                          <img src={editingProduct.image} alt="معاينة" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex-1 w-full space-y-2">
+                        <input
+                          type="url"
+                          placeholder="رابط صورة مباشر (URL)"
+                          value={editingProduct.image}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
+                          className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <label className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-medium rounded-xl border border-white/10 cursor-pointer flex items-center gap-2 transition-all">
+                            <Upload className="w-3.5 h-3.5 text-red-500" />
+                            <span>رفع صورة جديدة من جهازك</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleEditImageFileChange}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="sm:col-span-2">

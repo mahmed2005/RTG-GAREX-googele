@@ -90,7 +90,7 @@ export const DeliveryRatesAdmin: React.FC = () => {
     if (deliveryRates.length === 0) {
       return { count: 0, avg: 0, min: 0, max: 0 };
     }
-    const prices = deliveryRates.map((r) => r.price || 0);
+    const prices = deliveryRates.map((r) => Number(r.price) || 0);
     const sum = prices.reduce((a, b) => a + b, 0);
     return {
       count: deliveryRates.length,
