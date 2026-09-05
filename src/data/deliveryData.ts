@@ -360,48 +360,98 @@ export const ALL_DELIVERY_RATES: DeliveryCityRate[] = [
   { id: 'kufra', name: 'الكفرة', price: 50, priceDisplay: '50 د.ل', zoneId: 'south_east', zoneName: 'الجنوب الشرقي', estimatedTime: '72 - 96 ساعة' },
 ];
 
+// قائمة شاملة لأحياء ومناطق داخل طرابلس لضمان احتساب سعر التوصيل الداخلي بدقة
+const TRIPOLI_CENTRAL_KEYWORDS = [
+  'طرابلس', 'عين زارة', 'عين زاره', 'أبو سليم', 'ابو سليم', 'سوق الجمعة', 'سوق الجمعه',
+  'حي الأندلس', 'حي الاندلس', 'قرقارش', 'غوط الشعال', 'تاجوراء', 'تاجورا', 'جنزور',
+  'طريق المطار', 'الدريبي', 'الهضبة', 'الهضبه', 'الفرناج', 'زاوية الدهماني', 'بن عاشور',
+  'السياحية', 'السياحيه', 'النوفليين', 'السراج', 'فشلوم', 'زناتة', 'الظهرة',
+  'صلاح الدين', 'السبعة', 'السبعه', 'طريق الشوك', 'باب بن غشير', 'باب العزيزية',
+  'ميزران', 'شارع النصر', 'شارع عمر المختار', 'الجرابة', 'رأس حسن', 'راس حسن', 'بلدية طرابلس'
+];
+
 /**
  * Utility helper to lookup delivery price and zone for any city input string
  */
 export const findDeliveryRate = (search: string, customRates?: DeliveryCityRate[]): DeliveryCityRate | null => {
-  const rates = (customRates && customRates.length > 0) ? customRates : ALL_DELIVERY_RATES;
   if (!search || !search.trim()) return null;
-  const clean = search.trim().toLowerCase();
+  const clean = search.trim().toLowerCase().replace(/[\(\)\[\]\-]/g, ' ');
 
-  // 1. Direct exact or includes match
-  const found = rates.find(
+  const rates = (customRates && customRates.length > 0) ? customRates : ALL_DELIVERY_RATES;
+
+  // 1. Direct exact or substring match in active rates
+  const directMatch = rates.find(
     (rate) =>
       clean === rate.name.toLowerCase() ||
       clean.includes(rate.name.toLowerCase()) ||
       rate.name.toLowerCase().includes(clean) ||
       clean.includes(rate.id.toLowerCase())
   );
-  if (found) return found;
+  if (directMatch) return directMatch;
 
-  // 2. Zone lookup fallback
-  if (clean.includes('طرابلس') || clean.includes('سوق الجمعة') || clean.includes('تاجوراء') || clean.includes('جنزور')) {
-    return rates.find((r) => r.zoneId === 'tripoli_central') || rates[0] || null;
+  // 2. Check if the searched term is an inner Tripoli neighborhood
+  const isTripoliCentral = TRIPOLI_CENTRAL_KEYWORDS.some((kw) => clean.includes(kw));
+  if (isTripoliCentral) {
+    // Try to find Tripoli rate from customRates
+    const tripoliCustomRate = rates.find((r) => r.zoneId === 'tripoli_central' || r.name.includes('طرابلس'));
+    if (tripoliCustomRate) {
+      return {
+        ...tripoliCustomRate,
+        name: search.trim()
+      };
+    }
+    // Fallback to static Ain Zara / Tripoli Central rate
+    const staticTripoli = ALL_DELIVERY_RATES.find((r) => r.id === 'ain_zara' || r.id === 'tripoli_central') || ALL_DELIVERY_RATES[0];
+    return {
+      ...staticTripoli,
+      name: search.trim()
+    };
   }
+
+  // 3. Fallback lookup in default full catalog to find matching zone
+  const catalogMatch = ALL_DELIVERY_RATES.find(
+    (rate) =>
+      clean === rate.name.toLowerCase() ||
+      clean.includes(rate.name.toLowerCase()) ||
+      rate.name.toLowerCase().includes(clean) ||
+      clean.includes(rate.id.toLowerCase())
+  );
+
+  if (catalogMatch) {
+    // Check if customRates has a zone match for this city
+    const customZoneRate = rates.find(
+      (r) => r.zoneId === catalogMatch.zoneId || (catalogMatch.zoneName && r.zoneName.includes(catalogMatch.zoneName))
+    );
+    if (customZoneRate) {
+      return {
+        ...customZoneRate,
+        name: search.trim()
+      };
+    }
+    return catalogMatch;
+  }
+
+  // 4. Regional fallback keywords
   if (clean.includes('بنغازي')) {
-    return rates.find((r) => r.id === 'benghazi' || r.name.includes('بنغازي')) || null;
+    return rates.find((r) => r.id === 'benghazi' || r.name.includes('بنغازي')) || ALL_DELIVERY_RATES.find((r) => r.id === 'benghazi') || null;
   }
-  if (clean.includes('مصراتة')) {
-    return rates.find((r) => r.id === 'misrata' || r.name.includes('مصراتة')) || null;
+  if (clean.includes('مصراتة') || clean.includes('مصراته')) {
+    return rates.find((r) => r.id === 'misrata' || r.name.includes('مصراتة')) || ALL_DELIVERY_RATES.find((r) => r.id === 'misrata') || null;
   }
-  if (clean.includes('الزاوية') || clean.includes('زاوية')) {
-    return rates.find((r) => r.id === 'zawiya' || r.name.includes('الزاوية')) || null;
+  if (clean.includes('الزاوية') || clean.includes('زاوية') || clean.includes('الزاويه') || clean.includes('زاويه')) {
+    return rates.find((r) => r.id === 'zawiya' || r.name.includes('الزاوية')) || ALL_DELIVERY_RATES.find((r) => r.id === 'zawiya') || null;
   }
   if (clean.includes('زوارة') || clean.includes('زواره')) {
-    return rates.find((r) => r.id === 'zwara' || r.name.includes('زوارة')) || null;
+    return rates.find((r) => r.id === 'zwara' || r.name.includes('زوارة')) || ALL_DELIVERY_RATES.find((r) => r.id === 'zwara') || null;
   }
   if (clean.includes('الماية') || clean.includes('مايه') || clean.includes('المايه')) {
-    return rates.find((r) => r.id === 'maya' || r.name.includes('الماية')) || null;
+    return rates.find((r) => r.id === 'maya' || r.name.includes('الماية')) || ALL_DELIVERY_RATES.find((r) => r.id === 'maya') || null;
   }
   if (clean.includes('غريان')) {
-    return rates.find((r) => r.id === 'gharyan' || r.name.includes('غريان')) || null;
+    return rates.find((r) => r.id === 'gharyan' || r.name.includes('غريان')) || ALL_DELIVERY_RATES.find((r) => r.id === 'gharyan') || null;
   }
   if (clean.includes('سبها')) {
-    return rates.find((r) => r.id === 'sabha' || r.name.includes('سبها')) || null;
+    return rates.find((r) => r.id === 'sabha' || r.name.includes('سبها')) || ALL_DELIVERY_RATES.find((r) => r.id === 'sabha') || null;
   }
 
   return null;

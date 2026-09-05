@@ -35,10 +35,12 @@ export const PubgAccountsPage: React.FC = () => {
     window.open(formUrl, '_blank');
   };
 
-  // Filter only available and approved accounts
-  const visibleAccounts = pubgAccounts.filter(
-    (acc) => acc.isAvailable && acc.approved !== false && acc.status !== 'rejected'
-  );
+  // Filter accounts displayed on the site (displayOnSite = 'نعم' / approved)
+  const visibleAccounts = pubgAccounts.filter((acc) => {
+    if (acc.displayOnSite === 'لا' || acc.displayOnSite === 'كلا') return false;
+    if (acc.status === 'rejected') return false;
+    return true;
+  });
 
   return (
     <div className="py-8 sm:py-12 min-h-screen">
@@ -108,6 +110,7 @@ export const PubgAccountsPage: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
             {visibleAccounts.map((acc) => {
+              const isSold = acc.isSold || acc.saleStatus === 'تم البيع';
               const mythics = acc.mythicsCount || '—';
               const weapons = acc.upgradableWeaponsCount || '—';
               const cars = acc.carsCount || '—';
@@ -124,7 +127,7 @@ export const PubgAccountsPage: React.FC = () => {
                     videoUrl={acc.videoUrl}
                     thumbnailUrl={acc.image}
                     title={acc.title}
-                    badge={acc.badge || 'حساب موثق'}
+                    badge={isSold ? 'تم البيع' : (acc.badge || 'حساب موثق')}
                     level={acc.level || (acc.accountLevel ? `LVL ${acc.accountLevel}` : undefined)}
                     onExpand={(url) => setPreviewVideoUrl(url)}
                   />
@@ -135,14 +138,20 @@ export const PubgAccountsPage: React.FC = () => {
                       {/* Account Title Header */}
                       <div className="flex items-center justify-between gap-2 mb-4">
                         <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className={`w-2.5 h-2.5 rounded-full ${isSold ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
                           <h3 className="text-lg sm:text-xl font-black text-white tracking-wide">
                             {acc.title || acc.accountName || 'حساب PUBG مميز'}
                           </h3>
                         </div>
-                        <span className="text-[11px] font-bold text-red-400 bg-red-950/40 px-2.5 py-1 rounded-xl border border-red-500/20">
-                          {acc.badge || 'موثق'}
-                        </span>
+                        {isSold ? (
+                          <span className="text-[11px] font-black text-red-300 bg-red-950/80 px-2.5 py-1 rounded-xl border border-red-500/40">
+                            تم البيع
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-red-400 bg-red-950/40 px-2.5 py-1 rounded-xl border border-red-500/20">
+                            {acc.badge || 'موثق'}
+                          </span>
+                        )}
                       </div>
 
                       {/* Organized 4-Grid Specs (Flame / Target / Car / Link) */}
@@ -228,17 +237,27 @@ export const PubgAccountsPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <button
-                        id={`buy-account-btn-${acc.id}`}
-                        onClick={() => {
-                          soundEngine.playButtonClick();
-                          setSelectedAccountForBuy(acc);
-                        }}
-                        className="px-6 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-red-950/60 transition-all flex items-center gap-2"
-                      >
-                        <ShoppingBag className="w-4 h-4" />
-                        <span>شراء الحساب</span>
-                      </button>
+                      {isSold ? (
+                        <div
+                          id={`sold-account-badge-${acc.id}`}
+                          className="px-5 py-3 bg-red-950/40 border border-red-500/30 text-red-400 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 cursor-not-allowed select-none"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-red-500" />
+                          <span>تم بيع الحساب</span>
+                        </div>
+                      ) : (
+                        <button
+                          id={`buy-account-btn-${acc.id}`}
+                          onClick={() => {
+                            soundEngine.playButtonClick();
+                            setSelectedAccountForBuy(acc);
+                          }}
+                          className="px-6 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 active:scale-95 text-white rounded-2xl font-bold text-xs sm:text-sm shadow-lg shadow-red-950/60 transition-all flex items-center gap-2"
+                        >
+                          <ShoppingBag className="w-4 h-4" />
+                          <span>شراء الحساب</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

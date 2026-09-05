@@ -17,6 +17,18 @@ import {
   Filter
 } from 'lucide-react';
 
+// Arabic text normalizer for partial and fuzzy matching
+const normalizeArabic = (text: string): string => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/[\u064B-\u065F]/g, '');
+};
+
 export const DeliveryRatesPage: React.FC = () => {
   const { setCurrentPage, setIsCartOpen, settings, deliveryRates } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,19 +41,30 @@ export const DeliveryRatesPage: React.FC = () => {
     return deliveryRates.find((r) => r.id === selectedCityId) || null;
   }, [deliveryRates, selectedCityId]);
 
-  // Filtered Delivery Rates based on search and selected zone
+  // Filtered Delivery Rates based on partial search and selected zone
   const filteredRates = useMemo(() => {
+    const q = normalizeArabic(searchQuery);
+    const qWithoutAl = q.startsWith('ال') ? q.slice(2) : q;
+
     return deliveryRates.filter((rate) => {
-      const matchesSearch =
-        !searchQuery.trim() ||
-        rate.name.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-        rate.zoneName.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
-        rate.priceDisplay.toLowerCase().includes(searchQuery.trim().toLowerCase());
+      const matchesZone = selectedZoneId === 'all' || rate.zoneId === selectedZoneId;
+      if (!matchesZone) return false;
 
-      const matchesZone =
-        selectedZoneId === 'all' || rate.zoneId === selectedZoneId;
+      if (!q) return true;
 
-      return matchesSearch && matchesZone;
+      const name = normalizeArabic(rate.name);
+      const nameWithoutAl = name.startsWith('ال') ? name.slice(2) : name;
+      const zone = normalizeArabic(rate.zoneName);
+      const price = normalizeArabic(rate.priceDisplay || `${rate.price}`);
+
+      return (
+        name.includes(q) ||
+        (qWithoutAl.length >= 2 && name.includes(qWithoutAl)) ||
+        (nameWithoutAl.length >= 2 && q.includes(nameWithoutAl)) ||
+        nameWithoutAl.includes(qWithoutAl) ||
+        zone.includes(q) ||
+        price.includes(q)
+      );
     });
   }, [deliveryRates, searchQuery, selectedZoneId]);
 
@@ -51,10 +74,10 @@ export const DeliveryRatesPage: React.FC = () => {
         
         {/* 1. Page Header & Delivery Partner Badge */}
         <div className="text-center space-y-4 max-w-3xl mx-auto">
-          {/* Partner Badge */}
+          {/* Fast Delivery Badge (No درب السبيل branding) */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-600/15 border border-red-500/30 text-red-400 text-xs font-bold shadow-sm">
             <Truck className="w-4 h-4 text-red-500" />
-            <span>شركة درب السبيل لخدمات التوصيل • الإنطلاقة من طرابلس</span>
+            <span>خدمات التوصيل السريع • تغطية شاملة لكافة المدن الليبية</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
@@ -196,7 +219,7 @@ export const DeliveryRatesPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-2 px-2 text-[11px] text-slate-400 border-t border-white/5 pt-3">
             <span className="flex items-center gap-1 text-emerald-400 font-semibold">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>الأسعار رسمية ومحدثة من نظام شركة درب السبيل</span>
+              <span>الأسعار رسمية ومحدثة لكافة المدن والمناطق</span>
             </span>
             <span className="text-slate-500">
               إجمالي المدن المتاحة: <strong className="text-white font-mono">{deliveryRates.length}</strong> مدينة ومنطقة

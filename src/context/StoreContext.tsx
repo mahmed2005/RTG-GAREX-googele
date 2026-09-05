@@ -85,7 +85,11 @@ interface StoreContextType {
   // PUBG Submissions Management & Display toggle
   pubgSubmissions: PubgSellSubmission[];
   allPubgAccounts: PubgAccount[];
-  togglePubgDisplay: (id: string, newDisplay: 'نعم' | 'لا') => Promise<void>;
+  togglePubgDisplay: (id: string, newDisplay: 'نعم' | 'لا' | 'كلا') => Promise<void>;
+  togglePubgSold: (id: string, isSold: boolean) => Promise<void>;
+  toggleUcPackageStock: (id: string, isAvailable: boolean) => Promise<void>;
+  toggleProductStock: (id: string, inStock: boolean) => Promise<void>;
+  buyNowDirect: (product: Product, quantity?: number) => void;
   approvePubgSubmission: (id: string) => void;
   rejectPubgSubmission: (id: string) => void;
   deletePubgSubmission: (id: string) => void;
@@ -836,9 +840,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Toggle PUBG Account Display on website ("نعم" / "لا")
-  const togglePubgDisplay = async (id: string, newDisplay: 'نعم' | 'لا') => {
+  // Toggle PUBG Account Display on website ("نعم" / "كلا")
+  const togglePubgDisplay = async (id: string, newDisplay: 'نعم' | 'لا' | 'كلا') => {
     const isApproved = newDisplay === 'نعم';
+    const displayValue: 'نعم' | 'كلا' = isApproved ? 'نعم' : 'كلا';
 
     // 1. Update allPubgAccounts
     setAllPubgAccounts((prev) =>
@@ -846,10 +851,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         acc.id === id
           ? {
               ...acc,
-              displayOnSite: newDisplay,
+              displayOnSite: displayValue,
               approved: isApproved,
               status: isApproved ? 'approved' : 'pending',
-              isAvailable: isApproved,
+              isAvailable: isApproved && !acc.isSold,
             }
           : acc
       )
@@ -865,7 +870,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             displayOnSite: 'نعم',
             approved: true,
             status: 'approved',
-            isAvailable: true,
+            isAvailable: !target.isSold,
           };
           const exists = prev.some((a) => a.id === id);
           return exists
@@ -882,11 +887,96 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
       try {
-        await AppsScriptService.setPubgDisplay(appsScriptConfig.webAppUrl, id, newDisplay);
+        await AppsScriptService.setPubgDisplay(appsScriptConfig.webAppUrl, id, displayValue);
       } catch (err) {
         console.error('Error toggling PUBG account display in Google Sheets:', err);
       }
     }
+  };
+
+  // Toggle PUBG Account Sold Status ("متوفر" / "تم البيع")
+  const togglePubgSold = async (id: string, isSold: boolean) => {
+    const saleStatus = isSold ? 'تم البيع' : 'متوفر';
+
+    // 1. Update allPubgAccounts
+    setAllPubgAccounts((prev) =>
+      prev.map((acc) =>
+        acc.id === id
+          ? {
+              ...acc,
+              isSold,
+              sold: isSold,
+              saleStatus,
+              isAvailable: !isSold,
+              badge: isSold ? 'تم البيع' : 'حساب موثق',
+            }
+          : acc
+      )
+    );
+
+    // 2. Update pubgAccounts
+    setPubgAccounts((prev) =>
+      prev.map((acc) =>
+        acc.id === id
+          ? {
+              ...acc,
+              isSold,
+              sold: isSold,
+              saleStatus,
+              isAvailable: !isSold,
+              badge: isSold ? 'تم البيع' : 'حساب موثق',
+            }
+          : acc
+      )
+    );
+
+    // 3. Send update to Google Apps Script
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      try {
+        await AppsScriptService.setPubgSold(appsScriptConfig.webAppUrl, id, isSold);
+      } catch (err) {
+        console.error('Error toggling PUBG sold status in Google Sheets:', err);
+      }
+    }
+  };
+
+  // Toggle UC Package Stock (In-Stock / Out-of-Stock)
+  const toggleUcPackageStock = async (id: string, isAvailable: boolean) => {
+    setUcPackages((prev) =>
+      prev.map((pkg) => (pkg.id === id ? { ...pkg, isAvailable } : pkg))
+    );
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      try {
+        await AppsScriptService.setUcPackageStock(appsScriptConfig.webAppUrl, id, isAvailable);
+      } catch (err) {
+        console.error('Error toggling UC package stock in Google Sheets:', err);
+      }
+    }
+  };
+
+  // Toggle Product Stock (In-Stock / Out-of-Stock)
+  const toggleProductStock = async (id: string, inStock: boolean) => {
+    setProducts((prev) =>
+      prev.map((prod) => (prod.id === id ? { ...prod, inStock } : prod))
+    );
+
+    const appsScriptConfig = AppsScriptService.getConfig();
+    if (appsScriptConfig.webAppUrl) {
+      try {
+        await AppsScriptService.setProductStock(appsScriptConfig.webAppUrl, id, inStock);
+      } catch (err) {
+        console.error('Error toggling Product stock in Google Sheets:', err);
+      }
+    }
+  };
+
+  // Direct Buy Now Single Session (Without aggregating)
+  const buyNowDirect = (product: Product, quantity: number = 1) => {
+    setCart([{ product, quantity }]);
+    setIsCheckoutOpen(true);
   };
 
   const deletePubgAccount = (id: string) => {
@@ -1137,6 +1227,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         pubgSubmissions,
         allPubgAccounts,
         togglePubgDisplay,
+        togglePubgSold,
+        toggleUcPackageStock,
+        toggleProductStock,
+        buyNowDirect,
         approvePubgSubmission,
         rejectPubgSubmission,
         deletePubgSubmission,

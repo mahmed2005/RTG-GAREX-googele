@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
-import { ProductCard } from './ProductCard';
 import { soundEngine } from '../utils/soundEngine';
 import { 
   ArrowRight, 
@@ -9,8 +8,6 @@ import {
   Truck, 
   ShieldCheck, 
   RefreshCw, 
-  PhoneCall, 
-  MessageCircle, 
   Share2, 
   CheckCircle2, 
   Clock, 
@@ -20,7 +17,6 @@ import {
   Plus, 
   Minus,
   Layers,
-  Zap,
   Tag,
   AlertCircle
 } from 'lucide-react';
@@ -31,7 +27,7 @@ export const ProductDetailsPage: React.FC = () => {
     products, 
     setCurrentPage, 
     addToCart, 
-    setIsCheckoutOpen,
+    openProductDetails,
     deliveryRates,
     settings 
   } = useStore();
@@ -65,11 +61,16 @@ export const ProductDetailsPage: React.FC = () => {
     return deliveryRates.find((r) => r.id === selectedCityId) || null;
   }, [deliveryRates, selectedCityId]);
 
-  // Related products from same category or others
+  // Related products: strictly in-stock only, excluding current product
   const relatedProducts = useMemo(() => {
     return products
-      .filter((p) => p.id !== selectedProduct.id && (p.category === selectedProduct.category || selectedProduct.category === 'الكل'))
-      .slice(0, 4);
+      .filter(
+        (p) =>
+          p.id !== selectedProduct.id &&
+          p.inStock !== false &&
+          (p.category === selectedProduct.category || selectedProduct.category === 'الكل')
+      )
+      .slice(0, 6);
   }, [products, selectedProduct]);
 
   // Add to cart handler
@@ -78,24 +79,6 @@ export const ProductDetailsPage: React.FC = () => {
     addToCart(selectedProduct, quantity);
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2200);
-  };
-
-  // Buy Now direct checkout
-  const handleBuyNow = () => {
-    soundEngine.playButtonClick();
-    addToCart(selectedProduct, quantity);
-    setIsCheckoutOpen(true);
-  };
-
-  // Direct WhatsApp order
-  const handleWhatsAppOrder = () => {
-    soundEngine.playButtonClick();
-    const phone = settings.whatsappNumber ? settings.whatsappNumber.replace(/[^0-9]/g, '') : '218943981577';
-    const cleanPhone = phone.startsWith('218') ? phone : `218${phone.replace(/^0/, '')}`;
-    const text = encodeURIComponent(
-      `مرحباً، أود طلب المنتج التالي من متجر RTG:\n- المنتج: ${selectedProduct.name}\n- الفئة: ${selectedProduct.category}\n- الكمية: ${quantity}\n- السعر الإجمالي: ${(selectedProduct.price * quantity).toLocaleString()} د.ل`
-    );
-    window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
   };
 
   // Share product link
@@ -306,53 +289,33 @@ export const ProductDetailsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="space-y-3 pt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Add to Cart */}
-                  <button
-                    id="product-detail-add-cart-btn"
-                    onClick={handleAddToCart}
-                    disabled={!selectedProduct.inStock}
-                    className={`py-3.5 px-5 rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      addedToCart
-                        ? 'bg-emerald-600 text-white shadow-emerald-950/60'
-                        : 'bg-red-600 hover:bg-red-500 text-white shadow-red-950/60'
-                    }`}
-                  >
-                    {addedToCart ? (
-                      <>
-                        <Check className="w-4 h-4 stroke-[3]" />
-                        <span>تمت الإضافة للسلة بنجاح!</span>
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="w-4 h-4" />
-                        <span>إضافة إلى السلة ({quantity})</span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Buy Now Direct */}
-                  <button
-                    id="product-detail-buy-now-btn"
-                    onClick={handleBuyNow}
-                    disabled={!selectedProduct.inStock}
-                    className="py-3.5 px-5 rounded-2xl font-black text-xs sm:text-sm bg-white text-black hover:bg-slate-200 flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Zap className="w-4 h-4 text-red-600 fill-red-600" />
-                    <span>شراء مباشر الآن</span>
-                  </button>
-                </div>
-
-                {/* WhatsApp Direct Order Button */}
+              {/* Action Buttons: Only Add to Cart as explicitly requested by user */}
+              <div className="pt-2">
                 <button
-                  id="product-detail-whatsapp-btn"
-                  onClick={handleWhatsAppOrder}
-                  className="w-full py-3 px-4 rounded-2xl font-bold text-xs bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-2 transition-all"
+                  id="product-detail-add-cart-btn"
+                  onClick={handleAddToCart}
+                  disabled={!selectedProduct.inStock}
+                  className={`w-full py-4 px-6 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2.5 transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    addedToCart
+                      ? 'bg-emerald-600 text-white shadow-emerald-950/60'
+                      : 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-red-950/60'
+                  }`}
                 >
-                  <MessageCircle className="w-4 h-4 text-emerald-400" />
-                  <span>طلب مباشر أو استفسار عبر واتساب</span>
+                  {addedToCart ? (
+                    <>
+                      <Check className="w-5 h-5 stroke-[3]" />
+                      <span>تمت الإضافة للسلة بنجاح!</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-5 h-5" />
+                      <span>
+                        {!selectedProduct.inStock
+                          ? 'المنتج غير متوفر حالياً'
+                          : `إضافة إلى السلة (${quantity})`}
+                      </span>
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -427,13 +390,13 @@ export const ProductDetailsPage: React.FC = () => {
 
         </div>
 
-        {/* 3. Related Products Section */}
+        {/* 3. Related Products Section (Small compact cards, strictly in-stock only) */}
         {relatedProducts.length > 0 && (
           <div className="border-t border-white/10 pt-10 space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-black text-white flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-red-500" />
-                <span>منتجات أخرى قد تعجبك</span>
+                <span>منتجات ذات صلة متوفرة</span>
               </h3>
               <button
                 onClick={() => setCurrentPage('products')}
@@ -444,9 +407,63 @@ export const ProductDetailsPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {/* Small Compact Cards Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
               {relatedProducts.map((prod) => (
-                <ProductCard key={prod.id} product={prod} />
+                <div
+                  key={prod.id}
+                  id={`related-product-card-${prod.id}`}
+                  onClick={() => {
+                    soundEngine.playButtonClick();
+                    openProductDetails(prod);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="bg-[#141622] hover:bg-[#191d2c] border border-white/10 hover:border-red-500/40 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between transition-all duration-200 cursor-pointer group shadow-lg hover:shadow-red-950/20"
+                >
+                  <div>
+                    {/* Compact Image */}
+                    <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-black/40 mb-2 border border-white/5">
+                      <img
+                        src={prod.image}
+                        alt={prod.name}
+                        className="w-full h-full object-contain p-1 group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                      {prod.tag && (
+                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-red-600/90 text-white font-bold text-[9px]">
+                          {prod.tag}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <h4 className="text-xs font-bold text-white line-clamp-2 leading-snug mb-1 group-hover:text-red-400 transition-colors">
+                      {prod.name}
+                    </h4>
+                  </div>
+
+                  {/* Price & Quick Add */}
+                  <div className="pt-2 border-t border-white/5 flex items-center justify-between gap-1">
+                    <div className="text-right">
+                      <span className="text-xs sm:text-sm font-black text-red-500 font-mono">
+                        {prod.price.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-bold mr-1">د.ل</span>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundEngine.playSuccessSound();
+                        addToCart(prod, 1);
+                      }}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-red-600 text-slate-300 hover:text-white transition-colors"
+                      title="إضافة سريعة للسلة"
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

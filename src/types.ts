@@ -61,7 +61,10 @@ export interface PubgAccount {
   transferPhone?: string; // 13. رقم الهاتف المحول منه رسوم العرض (5 دينار)
   storeReceivePhone?: string; // 14. رقم الهاتف لتحويل 5 دينار إليه
   siteRating?: string | number; // 16. تقييمك للموقع
-  displayOnSite?: 'نعم' | 'لا'; // 17. هل يتم عرض هذا الحساب على الموقع؟
+  displayOnSite?: 'نعم' | 'لا' | 'كلا'; // 17. هل يتم عرض هذا الحساب على الموقع؟
+  isSold?: boolean; // هل تم بيع الحساب
+  sold?: boolean; // توافق
+  saleStatus?: 'متوفر' | 'تم البيع'; // حالة البيع
   
   // Extra media storage fields
   videoFileBase64?: string;
@@ -93,7 +96,7 @@ export interface PubgSellSubmission {
   storeReceivePhone?: string; // 14. رقم الهاتف المتاح بالموقع لتحويل 5 دينار إليه
   videoUrl?: string; // 15. فيديو لا يتجاوز 40 ثانية للحساب
   siteRating?: string; // 16. تقييمك للموقع
-  displayOnSite: 'نعم' | 'لا'; // 17. هل يتم عرض هذا الحساب على الموقع (نعم/لا)
+  displayOnSite: 'نعم' | 'لا' | 'كلا'; // 17. هل يتم عرض هذا الحساب على الموقع (نعم/لا/كلا)
   
   // Video upload metadata
   videoFileBase64?: string;
