@@ -326,7 +326,46 @@ async function startServer() {
     }
   });
 
-  // Server-Side Apps Script Proxy (Eliminates mobile browser CORS & Google Auth issues)
+  // Server-Side Apps Script GET Proxy (Eliminates mobile browser CORS, JSONP timeouts & Google Auth issues)
+  app.get('/api/apps-script-proxy', async (req, res) => {
+    try {
+      const targetUrl = (req.query.url as string) || '';
+      if (!targetUrl) {
+        return res.status(400).json({ status: 'error', message: 'Missing URL' });
+      }
+
+      const fullUrl = targetUrl.includes('?') ? `${targetUrl}&action=get_all` : `${targetUrl}?action=get_all`;
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        },
+      });
+
+      const text = await response.text();
+      try {
+        const json = JSON.parse(text);
+        res.json(json);
+      } catch {
+        // If response is jsonp callback wrapped: callbackName(...)
+        const jsonpMatch = text.match(/^[a-zA-Z0-9_]+\s*\(\s*([\s\S]*)\s*\)\s*;?$/);
+        if (jsonpMatch && jsonpMatch[1]) {
+          try {
+            res.json(JSON.parse(jsonpMatch[1]));
+            return;
+          } catch {}
+        }
+        res.send(text);
+      }
+    } catch (e: any) {
+      console.error('Apps Script GET proxy error:', e);
+      res.status(500).json({ status: 'error', message: e.message });
+    }
+  });
+
+  // Server-Side Apps Script POST Proxy (Eliminates mobile browser CORS & Google Auth issues)
   app.post('/api/apps-script-proxy', async (req, res) => {
     try {
       const { url, payload } = req.body;
@@ -336,6 +375,7 @@ async function startServer() {
 
       const response = await fetch(url, {
         method: 'POST',
+        redirect: 'follow',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload),
       });
@@ -348,6 +388,7 @@ async function startServer() {
         res.json({ status: 'success', raw: text });
       }
     } catch (e: any) {
+      console.error('Apps Script POST proxy error:', e);
       res.status(500).json({ status: 'error', message: e.message });
     }
   });

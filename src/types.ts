@@ -65,6 +65,8 @@ export interface PubgAccount {
   isSold?: boolean; // هل تم بيع الحساب
   sold?: boolean; // توافق
   saleStatus?: 'متوفر' | 'تم البيع'; // حالة البيع
+  rowIndex?: number; // رقم الصف في Google Sheets
+  rowNumber?: number; // رقم الصف في Google Sheets
   
   // Extra media storage fields
   videoFileBase64?: string;

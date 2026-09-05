@@ -79,48 +79,64 @@ export const PubgUcPage: React.FC = () => {
         ) : (
           <div className="space-y-4 mb-14">
             {ucPackages.map((pkg) => {
+              const isOutOfStock = pkg.isAvailable === false;
               const hasBonus = pkg.bonusUc > 0;
-              const totalUc = pkg.ucAmount + pkg.bonusUc;
+              const totalUc = pkg.ucAmount + (pkg.bonusUc || 0);
 
               return (
                 <div
                   key={pkg.id}
                   id={`uc-pkg-card-${pkg.id}`}
-                  className={`relative bg-[#12141e] hover:bg-[#161925] border rounded-3xl p-5 sm:p-6 transition-all duration-300 shadow-xl ${
-                    pkg.isPopular
+                  className={`relative border rounded-3xl p-5 sm:p-6 transition-all duration-300 shadow-xl ${
+                    isOutOfStock
+                      ? 'border-red-500/20 bg-[#0e1017]/90 opacity-80'
+                      : pkg.isPopular
                       ? 'border-amber-500/40 bg-[#161824]'
-                      : 'border-white/10 hover:border-red-500/30'
+                      : 'border-white/10 hover:border-red-500/30 bg-[#12141e] hover:bg-[#161925]'
                   }`}
                 >
-                  {/* Popular Star Tag */}
-                  {pkg.isPopular && (
+                  {/* Status Badge */}
+                  {isOutOfStock ? (
+                    <div className="absolute -top-3 right-6 bg-red-600/90 text-white font-extrabold text-[10px] px-3 py-0.5 rounded-full flex items-center gap-1 shadow-lg shadow-red-950/80 border border-red-500/40">
+                      <span>نفدت الكمية / غير متوفر</span>
+                    </div>
+                  ) : pkg.isPopular ? (
                     <div className="absolute -top-3 right-6 bg-amber-500 text-black font-extrabold text-[10px] px-3 py-0.5 rounded-full flex items-center gap-1 shadow-lg shadow-amber-950/80">
                       <Star className="w-3 h-3 fill-black" />
                       <span>الأكثر طلباً</span>
                     </div>
-                  )}
+                  ) : null}
 
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                     {/* UC Details */}
                     <div className="flex items-center gap-4 text-right w-full sm:w-auto">
-                      <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 flex-shrink-0">
-                        <Zap className="w-7 h-7 fill-amber-400" />
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                        isOutOfStock
+                          ? 'bg-slate-800/40 border border-slate-700/30 text-slate-500'
+                          : 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+                      }`}>
+                        <Zap className={`w-7 h-7 ${isOutOfStock ? 'fill-slate-600' : 'fill-amber-400'}`} />
                       </div>
 
                       <div>
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-2xl sm:text-3xl font-black text-white font-mono">
+                          <span className={`text-2xl sm:text-3xl font-black font-mono ${isOutOfStock ? 'text-slate-400' : 'text-white'}`}>
                             {pkg.ucAmount}
                           </span>
-                          <span className="text-sm font-bold text-amber-400">UC</span>
-                          {hasBonus && (
+                          <span className={`text-sm font-bold ${isOutOfStock ? 'text-slate-500' : 'text-amber-400'}`}>UC</span>
+                          {hasBonus && !isOutOfStock && (
                             <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 text-xs font-bold font-mono">
                               +{pkg.bonusUc} مجاناً
                             </span>
                           )}
+                          {isOutOfStock && (
+                            <span className="px-2 py-0.5 rounded-md bg-red-500/15 border border-red-500/30 text-red-400 text-xs font-bold">
+                              غير متاح للشحن
+                            </span>
+                          )}
                         </div>
 
-                        {hasBonus && (
+                        {hasBonus && !isOutOfStock && (
                           <p className="text-xs text-slate-400 mt-1">
                             المجموع: <span className="text-white font-mono font-bold">{totalUc} UC</span>
                           </p>
@@ -131,26 +147,35 @@ export const PubgUcPage: React.FC = () => {
                     {/* Price & Order Button */}
                     <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-white/5">
                       <div className="text-right sm:text-left">
-                        <span className="text-xl sm:text-2xl font-black text-white font-mono">
+                        <span className={`text-xl sm:text-2xl font-black font-mono ${isOutOfStock ? 'text-slate-500' : 'text-white'}`}>
                           {pkg.price}
                         </span>
                         <span className="text-xs text-slate-400 mr-1.5 font-sans">د.ل</span>
                       </div>
 
-                      <button
-                        id={`order-uc-btn-${pkg.id}`}
-                        onClick={() => {
-                          soundEngine.playButtonClick();
-                          setSelectedUcPackage(pkg);
-                        }}
-                        className={`px-7 py-3 rounded-2xl font-bold text-xs sm:text-sm active:scale-95 transition-all ${
-                          pkg.isPopular
-                            ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-950/60 font-extrabold'
-                            : 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-950/60'
-                        }`}
-                      >
-                        اطلب الآن
-                      </button>
+                      {isOutOfStock ? (
+                        <div
+                          id={`order-uc-btn-${pkg.id}`}
+                          className="px-6 py-3 rounded-2xl font-bold text-xs sm:text-sm bg-slate-800/80 border border-white/5 text-slate-400 cursor-not-allowed select-none text-center"
+                        >
+                          غير متوفر للشحن
+                        </div>
+                      ) : (
+                        <button
+                          id={`order-uc-btn-${pkg.id}`}
+                          onClick={() => {
+                            soundEngine.playButtonClick();
+                            setSelectedUcPackage(pkg);
+                          }}
+                          className={`px-7 py-3 rounded-2xl font-bold text-xs sm:text-sm active:scale-95 transition-all ${
+                            pkg.isPopular
+                              ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-950/60 font-extrabold'
+                              : 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-950/60'
+                          }`}
+                        >
+                          اطلب الآن
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

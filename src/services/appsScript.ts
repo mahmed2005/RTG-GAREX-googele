@@ -101,28 +101,36 @@ function doPost(e) {
       var accSheet = findSheet(ss, ['حسابات ببجي', 'حسابات ببجى', 'حسابات PUBG', 'PUBG', 'pubg']) || ss.getSheetByName('حسابات ببجي');
       var newId = sub.id || 'acc-' + new Date().getTime();
       var displayFlag = sub.displayOnSite || (action === 'add_pubg_account' ? 'نعم' : 'لا');
-      var saleFlag = (sub.isSold || sub.sold || sub.saleStatus === 'تم البيع') ? 'لا' : 'نعم'; // Q1: نعم = متاح للبيع / لا = تم بيع الحساب
+      var saleFlag = (sub.isSold || sub.sold || sub.saleStatus === 'تم البيع') ? 'لا' : 'نعم'; // نعم = متاح للبيع / لا = تم بيع الحساب
 
-      accSheet.appendRow([
-        newId,                                        // العمود 1 (A): المعرف
-        sub.ownerName || sub.fullName || '',          // العمود 2 (B): 1. اسم المالك
-        sub.accountName || sub.title || '',           // العمود 3 (C): 2. اسم الحساب المراد بيعه
-        sub.accountLevel || sub.level || '',          // العمود 4 (D): 3. مستوى الحساب
-        sub.mythicsCount || '0',                      // العمود 5 (E): 4. عدد المثكات الموجودة
-        sub.apartmentLevel || sub.powerLevel || '',   // العمود 6 (F): 5. مستوى الشقة / الروم
-        sub.goldCount || sub.goldenMythicsCount || '',// العمود 7 (G): 6. عدد مقاييس الذهب
-        sub.upgradableWeapons || sub.upgradableWeaponsCount || '', // العمود 8 (H): 7. عدد الأسلحة قيد التطوير
-        sub.carsCount || '0',                         // العمود 9 (I): 8. عدد السيارات
-        sub.hashtagsCount || '0',                     // العمود 10 (J): 9. عدد الهاشتاجات
-        sub.linkedServices || sub.linkedAccounts || '',// العمود 11 (K): 10. خدمات الربط
-        sub.salePrice || sub.price || '0',            // العمود 12 (L): 11. سعر بيع الحساب
-        sub.sellerPhone || sub.phone || '',           // العمود 13 (M): 12. رقم هاتف البائع
-        sub.transferPhone || '',                      // العمود 14 (N): 13. رقم الهاتف المحول منه 5 دينار
-        sub.storeReceivePhone || '0943981577',        // العمود 15 (O): 14. رقم الهاتف لتحويل 5 دينار إليه
-        videoFinalUrl,                                // العمود 16 (P): 15. فيديو الحساب
-        saleFlag,                                     // العمود 17 (Q1): متاح للبيع؟ (نعم = متاح / لا = تم بيع الحساب)
-        displayFlag                                   // العمود 18 (R1): هل يتم عرض هذا الحساب على الموقع؟ (نعم / لا)
-      ]);
+      var pColsSubmit = getPubgColumnIndices(accSheet);
+      var rowToInsert = [];
+      rowToInsert[0] = newId;                                                      // 1. الطابع الزمني / المعرف
+      rowToInsert[1] = sub.ownerName || sub.fullName || '';                        // 2. الاسم الثلاثي
+      rowToInsert[2] = sub.accountName || sub.title || '';                         // 3. اسم الحساب
+      rowToInsert[3] = sub.accountLevel || sub.level || '';                        // 4. مستوى الحساب
+      rowToInsert[4] = sub.mythicsCount || '0';                                    // 5. عدد الميثيك
+      rowToInsert[5] = sub.apartmentLevel || sub.powerLevel || '';                 // 6. مستوى السكنات
+      rowToInsert[6] = sub.goldCount || sub.goldenMythicsCount || '';              // 7. عدد الميثيك الذهبي
+      rowToInsert[7] = sub.upgradableWeapons || sub.upgradableWeaponsCount || '';  // 8. عدد الأسلحة
+      rowToInsert[8] = sub.carsCount || '0';                                       // 9. عدد السيارات
+      rowToInsert[9] = sub.hashtagsCount || '0';                                   // 10. عدد الهاشتاجات
+      rowToInsert[10] = sub.linkedServices || sub.linkedAccounts || '';            // 11. الربط
+      rowToInsert[11] = sub.salePrice || sub.price || '0';                         // 12. السعر
+      rowToInsert[12] = sub.sellerPhone || sub.phone || '';                        // 13. رقم الهاتف
+      rowToInsert[13] = sub.transferPhone || '';                                   // 14. رقم الهاتف المحول منه 5 دينار
+      rowToInsert[14] = videoFinalUrl;                                             // 15. فيديو للحساب
+      rowToInsert[15] = '5';                                                       // 16. تقييم للموقع بكل صدق
+      if (pColsSubmit.dispCol >= 19) {
+        rowToInsert[16] = '5';                                                     // 17. تقييم للموقع (متكررة)
+        rowToInsert[17] = saleFlag;                                                // 18. متاح نعم أو لا
+        rowToInsert[18] = displayFlag;                                             // 19. عرض الحساب في الموقع
+      } else {
+        rowToInsert[16] = saleFlag;                                                // 17. متاح نعم أو لا
+        rowToInsert[17] = displayFlag;                                             // 18. عرض الحساب في الموقع
+      }
+
+      accSheet.appendRow(rowToInsert);
 
       return createJsonResponse({ 
         status: 'success', 
@@ -132,139 +140,155 @@ function doPost(e) {
       });
     }
 
-    // 2. تغيير حالة عرض الحساب في الموقع (نعم / لا) عبر العمود R1 (العمود 18)
-    if (action === 'set_pubg_display' || action === 'approve_pubg_submission' || action === 'reject_pubg_submission') {
-      var accId = payload.id || payload.submissionId;
-      var rawDisplay = payload.display || (action === 'approve_pubg_submission' ? 'نعم' : 'لا');
-      var newDisplay = (rawDisplay === 'نعم' || rawDisplay === true) ? 'نعم' : 'لا';
+    // 2. تغيير حالة عرض الحساب في الموقع (نعم / لا) بمرونة عبر العمود المخصص
+    if (action === 'set_pubg_display' || action === 'toggle_pubg_display' || action === 'approve_pubg_submission' || action === 'reject_pubg_submission') {
       var sheetA = findSheet(ss, ['حسابات ببجي', 'حسابات ببجى', 'حسابات PUBG', 'PUBG', 'pubg']) || ss.getSheetByName('حسابات ببجي');
-      var aRows = sheetA.getDataRange().getValues();
-      var foundA = false;
-      var targetAccId = String(accId || '').trim().toLowerCase();
+      if (!sheetA) return createJsonResponse({ status: 'error', message: 'ورقة حسابات ببجي غير موجودة' });
 
-      for (var rowIdx = 1; rowIdx < aRows.length; rowIdx++) {
-        var r0 = String(aRows[rowIdx][0] || '').trim().toLowerCase();
-        var r1 = String(aRows[rowIdx][1] || '').trim().toLowerCase();
-        var r2 = String(aRows[rowIdx][2] || '').trim().toLowerCase();
-        var r12 = String(aRows[rowIdx][12] || '').trim().toLowerCase();
-        if (r0 === targetAccId || (targetAccId && (r2 === targetAccId || r1 === targetAccId || r12 === targetAccId))) {
-          sheetA.getRange(rowIdx + 1, 18).setValue(newDisplay); // الخلية R1 (العمود 18)
-          foundA = true;
-          break;
-        }
-      }
+      var colsD = getPubgColumnIndices(sheetA);
+      var aRowsD = sheetA.getDataRange().getValues();
+      var targetRowD = findPubgRowIndex(sheetA, payload, aRowsD, colsD);
 
-      if (foundA) {
-        return createJsonResponse({ status: 'success', message: 'تم تحديث حالة عرض الحساب بالعمود R1 إلى: ' + newDisplay });
+      var rawDisplay = payload.display || (action === 'approve_pubg_submission' ? 'نعم' : (action === 'reject_pubg_submission' ? 'لا' : 'نعم'));
+      var newDisplay = (rawDisplay === 'نعم' || rawDisplay === true || rawDisplay === 'yes') ? 'نعم' : 'لا';
+
+      if (targetRowD > 1) {
+        sheetA.getRange(targetRowD, colsD.dispCol).setValue(newDisplay);
+        return createJsonResponse({ 
+          status: 'success', 
+          message: 'تم تحديث حالة عرض الحساب بالصف ' + targetRowD + ' بالعمود ' + colsD.dispCol + ' إلى: ' + newDisplay,
+          row: targetRowD,
+          display: newDisplay
+        });
       }
-      return createJsonResponse({ status: 'error', message: 'لم يتم العثور على الحساب' });
+      return createJsonResponse({ status: 'error', message: 'لم يتم العثور على الحساب لتعديل حالة العرض' });
     }
 
-    // 2.5. تغيير حالة توفر الحساب للبيع عبر العمود Q1 (العمود 17: نعم = متاح / لا = تم البيع)
-    if (action === 'set_pubg_sold' || action === 'toggle_pubg_sold') {
-      var sAccId = payload.id || payload.submissionId;
-      var isSold = payload.isSold === true || payload.sold === true || payload.saleStatus === 'تم البيع';
-      var saleFlagVal = isSold ? 'لا' : 'نعم'; // Q1: نعم = متاح للبيع / لا = تم بيع الحساب
+    // 2.5. تغيير حالة توفر الحساب للبيع (نعم = متاح للبيع / لا = تم بيع الحساب)
+    if (action === 'set_pubg_sold' || action === 'toggle_pubg_sold' || action === 'set_pubg_available') {
       var sheetASold = findSheet(ss, ['حسابات ببجي', 'حسابات ببجى', 'حسابات PUBG', 'PUBG', 'pubg']) || ss.getSheetByName('حسابات ببجي');
+      if (!sheetASold) return createJsonResponse({ status: 'error', message: 'ورقة حسابات ببجي غير موجودة' });
+
+      var colsS = getPubgColumnIndices(sheetASold);
       var aRowsSold = sheetASold.getDataRange().getValues();
-      var foundSold = false;
-      var targetSoldId = String(sAccId || '').trim().toLowerCase();
+      var targetRowS = findPubgRowIndex(sheetASold, payload, aRowsSold, colsS);
 
-      for (var sIdx = 1; sIdx < aRowsSold.length; sIdx++) {
-        var sr0 = String(aRowsSold[sIdx][0] || '').trim().toLowerCase();
-        var sr1 = String(aRowsSold[sIdx][1] || '').trim().toLowerCase();
-        var sr2 = String(aRowsSold[sIdx][2] || '').trim().toLowerCase();
-        var sr12 = String(aRowsSold[sIdx][12] || '').trim().toLowerCase();
-        if (sr0 === targetSoldId || (targetSoldId && (sr2 === targetSoldId || sr1 === targetSoldId || sr12 === targetSoldId))) {
-          sheetASold.getRange(sIdx + 1, 17).setValue(saleFlagVal); // الخلية Q1 (العمود 17)
-          foundSold = true;
-          break;
-        }
-      }
+      var isSold = (payload.isSold === true || payload.sold === true || payload.saleStatus === 'تم البيع' || payload.available === false || payload.isAvailable === false);
+      var saleFlagVal = isSold ? 'لا' : 'نعم'; // نعم = متاح للبيع / لا = تم بيع الحساب
 
-      if (foundSold) {
-        return createJsonResponse({ status: 'success', message: 'تم تحديث توفر الحساب بالعمود Q1 إلى: ' + saleFlagVal + ' (' + (isSold ? 'تم البيع' : 'متاح للبيع') + ')' });
+      if (targetRowS > 1) {
+        sheetASold.getRange(targetRowS, colsS.availCol).setValue(saleFlagVal);
+        return createJsonResponse({ 
+          status: 'success', 
+          message: 'تم تحديث توفر الحساب بالصف ' + targetRowS + ' بالعمود ' + colsS.availCol + ' إلى: ' + saleFlagVal + ' (' + (isSold ? 'تم البيع' : 'متاح للبيع') + ')',
+          row: targetRowS,
+          isSold: isSold,
+          available: !isSold
+        });
       }
-      return createJsonResponse({ status: 'error', message: 'لم يتم العثور على الحساب' });
+      return createJsonResponse({ status: 'error', message: 'لم يتم العثور على الحساب لتعديل حالة البيع' });
     }
 
     // 3. حذف حساب ببجي نهائياً من Google Sheets
     if (action === 'delete_pubg_account') {
-      var delAccId = String(payload.id || '').trim();
-      var sheetDelA = ss.getSheetByName('حسابات ببجي');
-      var delRowsA = sheetDelA.getDataRange().getValues();
-      for (var dIdx = 1; dIdx < delRowsA.length; dIdx++) {
-        var rowId = String(delRowsA[dIdx][0] || '').trim();
-        var rowTitle = String(delRowsA[dIdx][2] || '').trim();
-        if (rowId === delAccId || (delAccId && rowTitle === delAccId)) {
-          sheetDelA.deleteRow(dIdx + 1);
-          return createJsonResponse({ status: 'success', message: 'تم حذف الحساب بنجاح نهائياً من Google Sheets' });
+      var sheetDelA = findSheet(ss, ['حسابات ببجي', 'حسابات ببجى', 'حسابات PUBG', 'PUBG', 'pubg']) || ss.getSheetByName('حسابات ببجي');
+      if (sheetDelA) {
+        var colsDel = getPubgColumnIndices(sheetDelA);
+        var delRowsA = sheetDelA.getDataRange().getValues();
+        var targetDelRow = findPubgRowIndex(sheetDelA, payload, delRowsA, colsDel);
+        if (targetDelRow > 1) {
+          sheetDelA.deleteRow(targetDelRow);
+          return createJsonResponse({ status: 'success', message: 'تم حذف الحساب بنجاح نهائياً من Google Sheets بالصف ' + targetDelRow });
         }
       }
-      return createJsonResponse({ status: 'success', message: 'تم تنفيذ الحذف بنجاح' });
+      return createJsonResponse({ status: 'success', message: 'تم تنفيذ أمر الحذف' });
     }
 
     // 3.5. تعديل حساب ببجي
     if (action === 'update_pubg_account') {
       var upAcc = payload.data || payload;
-      var upAccId = String(payload.id || upAcc.id || '').trim();
-      var sheetA = ss.getSheetByName('حسابات ببجي');
-      var aData = sheetA.getDataRange().getValues();
-      var aFound = -1;
+      var sheetAUp = findSheet(ss, ['حسابات ببجي', 'حسابات ببجى', 'حسابات PUBG', 'PUBG', 'pubg']) || ss.getSheetByName('حسابات ببجي');
+      if (!sheetAUp) return createJsonResponse({ status: 'error', message: 'ورقة حسابات ببجي غير موجودة' });
 
-      for (var ai = 1; ai < aData.length; ai++) {
-        if (String(aData[ai][0]).trim() === upAccId || (upAccId && String(aData[ai][2]).trim() === upAccId)) {
-          aFound = ai + 1;
-          break;
-        }
+      var colsUp = getPubgColumnIndices(sheetAUp);
+      var aDataUp = sheetAUp.getDataRange().getValues();
+      var aFoundRow = findPubgRowIndex(sheetAUp, payload, aDataUp, colsUp);
+
+      var videoFinal = upAcc.videoUrl !== undefined ? upAcc.videoUrl : (aFoundRow > 0 ? aDataUp[aFoundRow - 1][14] : '');
+
+      var qAvailVal = 'نعم';
+      if (upAcc.isAvailable !== undefined) {
+        qAvailVal = (upAcc.isAvailable === true || upAcc.isAvailable === 'نعم') ? 'نعم' : 'لا';
+      } else if (upAcc.isSold !== undefined) {
+        qAvailVal = (upAcc.isSold === true || upAcc.isSold === 'نعم') ? 'لا' : 'نعم';
+      } else if (upAcc.saleStatus !== undefined) {
+        qAvailVal = (upAcc.saleStatus === 'تم البيع') ? 'لا' : 'نعم';
+      } else if (aFoundRow > 0) {
+        qAvailVal = aDataUp[aFoundRow - 1][colsUp.availIdx] || 'نعم';
       }
 
-      var videoFinal = upAcc.videoUrl !== undefined ? upAcc.videoUrl : (aFound > 0 ? aData[aFound-1][15] : '');
+      var rDispVal = 'نعم';
+      if (upAcc.displayOnSite !== undefined) {
+        rDispVal = (upAcc.displayOnSite === 'نعم' || upAcc.displayOnSite === true) ? 'نعم' : 'لا';
+      } else if (upAcc.approved !== undefined) {
+        rDispVal = upAcc.approved ? 'نعم' : 'لا';
+      } else if (aFoundRow > 0) {
+        rDispVal = aDataUp[aFoundRow - 1][colsUp.dispIdx] || 'لا';
+      }
 
-      if (aFound > 0) {
-        var updatedARow = [
-          upAccId,
-          upAcc.ownerName !== undefined ? upAcc.ownerName : aData[aFound-1][1],
-          upAcc.accountName !== undefined ? upAcc.accountName : (upAcc.title || aData[aFound-1][2]),
-          upAcc.accountLevel !== undefined ? upAcc.accountLevel : (upAcc.level || aData[aFound-1][3]),
-          upAcc.mythicsCount !== undefined ? upAcc.mythicsCount : aData[aFound-1][4],
-          upAcc.apartmentLevel !== undefined ? upAcc.apartmentLevel : aData[aFound-1][5],
-          upAcc.goldCount !== undefined ? upAcc.goldCount : aData[aFound-1][6],
-          upAcc.upgradableWeaponsCount !== undefined ? upAcc.upgradableWeaponsCount : (upAcc.upgradableWeapons || aData[aFound-1][7]),
-          upAcc.carsCount !== undefined ? upAcc.carsCount : aData[aFound-1][8],
-          upAcc.hashtagsCount !== undefined ? upAcc.hashtagsCount : aData[aFound-1][9],
-          upAcc.linkedServices !== undefined ? upAcc.linkedServices : (upAcc.linkedAccounts || aData[aFound-1][10]),
-          upAcc.salePrice !== undefined ? upAcc.salePrice : (upAcc.price || aData[aFound-1][11]),
-          upAcc.sellerPhone !== undefined ? upAcc.sellerPhone : aData[aFound-1][12],
-          upAcc.transferPhone !== undefined ? upAcc.transferPhone : aData[aFound-1][13],
-          upAcc.storeReceivePhone !== undefined ? upAcc.storeReceivePhone : aData[aFound-1][14],
-          videoFinal,
-          upAcc.siteRating !== undefined ? upAcc.siteRating : aData[aFound-1][16],
-          upAcc.displayOnSite !== undefined ? upAcc.displayOnSite : aData[aFound-1][17]
-        ];
-        sheetA.getRange(aFound, 1, 1, updatedARow.length).setValues([updatedARow]);
-        return createJsonResponse({ status: 'success', message: 'تم تحديث بيانات حساب PUBG بنجاح' });
+      if (aFoundRow > 1) {
+        var existingRow = aDataUp[aFoundRow - 1].slice();
+        while (existingRow.length < Math.max(sheetAUp.getLastColumn(), colsUp.dispCol)) {
+          existingRow.push('');
+        }
+
+        if (upAcc.ownerName !== undefined) existingRow[colsUp.ownerName] = upAcc.ownerName;
+        if (upAcc.accountName !== undefined || upAcc.title !== undefined) existingRow[colsUp.accountName] = upAcc.accountName || upAcc.title;
+        if (upAcc.accountLevel !== undefined || upAcc.level !== undefined) existingRow[colsUp.level] = upAcc.accountLevel || upAcc.level;
+        if (upAcc.mythicsCount !== undefined) existingRow[colsUp.mythics] = upAcc.mythicsCount;
+        if (upAcc.apartmentLevel !== undefined || upAcc.powerLevel !== undefined) existingRow[colsUp.powerLevel] = upAcc.apartmentLevel || upAcc.powerLevel;
+        if (upAcc.goldCount !== undefined || upAcc.goldenMythicsCount !== undefined) existingRow[colsUp.goldMythics] = upAcc.goldCount || upAcc.goldenMythicsCount;
+        if (upAcc.upgradableWeaponsCount !== undefined || upAcc.upgradableWeapons !== undefined) existingRow[colsUp.weapons] = upAcc.upgradableWeaponsCount || upAcc.upgradableWeapons;
+        if (upAcc.carsCount !== undefined) existingRow[colsUp.cars] = upAcc.carsCount;
+        if (upAcc.hashtagsCount !== undefined) existingRow[colsUp.hashtags] = upAcc.hashtagsCount;
+        if (upAcc.linkedServices !== undefined || upAcc.linkedAccounts !== undefined) existingRow[colsUp.linked] = upAcc.linkedServices || upAcc.linkedAccounts;
+        if (upAcc.salePrice !== undefined || upAcc.price !== undefined) existingRow[colsUp.price] = upAcc.salePrice || upAcc.price;
+        if (upAcc.sellerPhone !== undefined || upAcc.phone !== undefined) existingRow[colsUp.phone] = upAcc.sellerPhone || upAcc.phone;
+        if (upAcc.transferPhone !== undefined) existingRow[colsUp.transferPhone] = upAcc.transferPhone;
+        if (videoFinal) existingRow[colsUp.video] = videoFinal;
+        existingRow[colsUp.availIdx] = qAvailVal;
+        existingRow[colsUp.dispIdx] = rDispVal;
+
+        sheetAUp.getRange(aFoundRow, 1, 1, existingRow.length).setValues([existingRow]);
+        return createJsonResponse({ status: 'success', message: 'تم تحديث بيانات حساب PUBG بنجاح بالصف ' + aFoundRow });
       } else {
-        sheetA.appendRow([
-          upAccId,
-          upAcc.ownerName || '',
-          upAcc.accountName || upAcc.title || '',
-          upAcc.accountLevel || upAcc.level || '',
-          upAcc.mythicsCount || '0',
-          upAcc.apartmentLevel || '',
-          upAcc.goldCount || '',
-          upAcc.upgradableWeaponsCount || upAcc.upgradableWeapons || '',
-          upAcc.carsCount || '0',
-          upAcc.hashtagsCount || '0',
-          upAcc.linkedServices || upAcc.linkedAccounts || '',
-          upAcc.salePrice || upAcc.price || '0',
-          upAcc.sellerPhone || '',
-          upAcc.transferPhone || '',
-          upAcc.storeReceivePhone || '0943981577',
-          videoFinal,
-          upAcc.siteRating || '5',
-          upAcc.displayOnSite || 'نعم'
-        ]);
+        var newAppendRow = [];
+        newAppendRow[0] = upAcc.id || 'acc-' + new Date().getTime();
+        newAppendRow[1] = upAcc.ownerName || '';
+        newAppendRow[2] = upAcc.accountName || upAcc.title || '';
+        newAppendRow[3] = upAcc.accountLevel || upAcc.level || '';
+        newAppendRow[4] = upAcc.mythicsCount || '0';
+        newAppendRow[5] = upAcc.apartmentLevel || upAcc.powerLevel || '';
+        newAppendRow[6] = upAcc.goldCount || upAcc.goldenMythicsCount || '';
+        newAppendRow[7] = upAcc.upgradableWeaponsCount || upAcc.upgradableWeapons || '';
+        newAppendRow[8] = upAcc.carsCount || '0';
+        newAppendRow[9] = upAcc.hashtagsCount || '0';
+        newAppendRow[10] = upAcc.linkedServices || upAcc.linkedAccounts || '';
+        newAppendRow[11] = upAcc.salePrice || upAcc.price || '0';
+        newAppendRow[12] = upAcc.sellerPhone || upAcc.phone || '';
+        newAppendRow[13] = upAcc.transferPhone || '';
+        newAppendRow[14] = videoFinal;
+        newAppendRow[15] = '5';
+        if (colsUp.dispCol >= 19) {
+          newAppendRow[16] = '5';
+          newAppendRow[17] = qAvailVal;
+          newAppendRow[18] = rDispVal;
+        } else {
+          newAppendRow[16] = qAvailVal;
+          newAppendRow[17] = rDispVal;
+        }
+
+        sheetAUp.appendRow(newAppendRow);
         return createJsonResponse({ status: 'success', message: 'تم حفظ حساب PUBG بنجاح' });
       }
     }
@@ -272,7 +296,8 @@ function doPost(e) {
     // 4. إضافة منتج جديد
     if (action === 'add_product') {
       var p = payload.data || payload;
-      var pSheet = ss.getSheetByName('المنتجات');
+      var pSheet = findSheet(ss, ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products']) || ss.getSheetByName('المنتجات');
+      if (!pSheet) return createJsonResponse({ status: 'error', message: 'ورقة المنتجات غير موجودة' });
       var prodId = p.id || 'prod-' + new Date().getTime();
       var prodImage = p.image || '';
 
@@ -312,7 +337,8 @@ function doPost(e) {
     if (action === 'update_product') {
       var upProd = payload.data || payload;
       var upProdId = String(payload.id || upProd.id || '').trim();
-      var sheetP = ss.getSheetByName('المنتجات');
+      var sheetP = findSheet(ss, ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products']) || ss.getSheetByName('المنتجات');
+      if (!sheetP) return createJsonResponse({ status: 'error', message: 'ورقة المنتجات غير موجودة' });
       var pData = sheetP.getDataRange().getValues();
       var pFound = -1;
 
@@ -361,7 +387,7 @@ function doPost(e) {
     if (action === 'set_product_stock' || action === 'toggle_product_stock') {
       var sProdId = String(payload.id || '').trim();
       var inStockVal = (payload.inStock !== false && payload.inStock !== 'لا' && payload.inStock !== 0) ? 'نعم' : 'لا';
-      var sheetStkP = ss.getSheetByName('المنتجات');
+      var sheetStkP = findSheet(ss, ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products']) || ss.getSheetByName('المنتجات');
       if (sheetStkP) {
         var pDataStk = sheetStkP.getDataRange().getValues();
         var colMapStk = getProductColumnMap(sheetStkP);
@@ -384,14 +410,16 @@ function doPost(e) {
     // 6. حذف منتج نهائياً من Google Sheets
     if (action === 'delete_product') {
       var delPId = String(payload.id || '').trim();
-      var sheetDelP = ss.getSheetByName('المنتجات');
-      var pRowsDel = sheetDelP.getDataRange().getValues();
-      for (var pdi = 1; pdi < pRowsDel.length; pdi++) {
-        var pid = String(pRowsDel[pdi][0] || '').trim();
-        var pname = String(pRowsDel[pdi][1] || '').trim();
-        if (pid === delPId || (delPId && pname === delPId)) {
-          sheetDelP.deleteRow(pdi + 1);
-          return createJsonResponse({ status: 'success', message: 'تم حذف المنتج نهائياً من Google Sheets' });
+      var sheetDelP = findSheet(ss, ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products']) || ss.getSheetByName('المنتجات');
+      if (sheetDelP) {
+        var pRowsDel = sheetDelP.getDataRange().getValues();
+        for (var pdi = 1; pdi < pRowsDel.length; pdi++) {
+          var pid = String(pRowsDel[pdi][0] || '').trim();
+          var pname = String(pRowsDel[pdi][1] || '').trim();
+          if (pid === delPId || (delPId && pname === delPId)) {
+            sheetDelP.deleteRow(pdi + 1);
+            return createJsonResponse({ status: 'success', message: 'تم حذف المنتج نهائياً من Google Sheets' });
+          }
         }
       }
       return createJsonResponse({ status: 'success', message: 'تم تنفيذ حذف المنتج' });
@@ -465,14 +493,16 @@ function doPost(e) {
     // 9. حذف باقة شدات UC نهائياً من Google Sheets
     if (action === 'delete_uc_package') {
       var delUcId = String(payload.id || '').trim();
-      var sheetDelUc = ss.getSheetByName('باقات الشدات');
-      var rowsDelUc = sheetDelUc.getDataRange().getValues();
-      for (var duci = 1; duci < rowsDelUc.length; duci++) {
-        var rUcId = String(rowsDelUc[duci][0] || '').trim();
-        var rUcAmount = String(rowsDelUc[duci][1] || '').trim();
-        if (rUcId === delUcId || (delUcId && rUcAmount === delUcId)) {
-          sheetDelUc.deleteRow(duci + 1);
-          return createJsonResponse({ status: 'success', message: 'تم حذف باقة الشدات نهائياً من Google Sheets' });
+      var sheetDelUc = findSheet(ss, ['باقات الشدات', 'باقة شدات والمنتجات', 'باقة شدات', 'شدات ببجي', 'UC Packages', 'UC']) || ss.getSheetByName('باقات الشدات');
+      if (sheetDelUc) {
+        var rowsDelUc = sheetDelUc.getDataRange().getValues();
+        for (var duci = 1; duci < rowsDelUc.length; duci++) {
+          var rUcId = String(rowsDelUc[duci][0] || '').trim();
+          var rUcAmount = String(rowsDelUc[duci][1] || '').trim();
+          if (rUcId === delUcId || (delUcId && rUcAmount === delUcId)) {
+            sheetDelUc.deleteRow(duci + 1);
+            return createJsonResponse({ status: 'success', message: 'تم حذف باقة الشدات نهائياً من Google Sheets' });
+          }
         }
       }
       return createJsonResponse({ status: 'success', message: 'تم حذف باقة الشدات' });
@@ -483,7 +513,7 @@ function doPost(e) {
       var setObj = payload.data || payload;
 
       // تحديث ورقة "صفحات التواصل"
-      var socSheet = ss.getSheetByName('صفحات التواصل');
+      var socSheet = findSheet(ss, ['صفحات التواصل', 'روابط التواصل', 'التواصل', 'Social Links', 'Social']) || ss.getSheetByName('صفحات التواصل');
       if (socSheet) {
         socSheet.clearContents();
         var socHeader = ['المعرف', 'اسم المنصة', 'الرابط المباشر (URL)', 'اسم المعرف/الحساب (@Handle)', 'ملاحظات / رقم'];
@@ -500,7 +530,7 @@ function doPost(e) {
       }
 
       // تحديث ورقة "إعدادات المتجر"
-      var setSheet = ss.getSheetByName('إعدادات المتجر');
+      var setSheet = findSheet(ss, ['Store Setting', 'Store Settings', 'إعدادات المتجر', 'اعدادات المتجر', 'Settings']) || ss.getSheetByName('إعدادات المتجر');
       if (setSheet) {
         setSheet.clearContents();
         var setHeader = ['اسم الإعداد', 'القيمة'];
@@ -528,27 +558,30 @@ function doPost(e) {
     // 11. إضافة طلب شراء
     if (action === 'submit_order') {
       var order = payload.data || payload;
-      var ordSheet = ss.getSheetByName('الطلبات الواردة');
-      ordSheet.appendRow([
-        order.id || 'ORD-' + new Date().getTime(),
-        order.date || new Date().toLocaleString('ar-LY'),
-        order.type || '',
-        order.customerName || '',
-        order.phone || '',
-        order.city || '',
-        order.region || '',
-        order.paymentMethod || '',
-        order.total || 0,
-        order.status || 'قيد الانتظار',
-        JSON.stringify(order.items || [])
-      ]);
-      return createJsonResponse({ status: 'success', message: 'تم تسجيل الطلب في Google Sheets' });
+      var ordSheet = findSheet(ss, ['الطلبات الواردة', 'طلبات الواردة', 'الطلبات', 'طلبات الشراء', 'Orders']) || ss.getSheetByName('الطلبات الواردة');
+      if (ordSheet) {
+        ordSheet.appendRow([
+          order.id || 'ORD-' + new Date().getTime(),
+          order.date || new Date().toLocaleString('ar-LY'),
+          order.type || '',
+          order.customerName || '',
+          order.phone || '',
+          order.city || '',
+          order.region || '',
+          order.paymentMethod || '',
+          order.total || 0,
+          order.status || 'قيد الانتظار',
+          JSON.stringify(order.items || [])
+        ]);
+        return createJsonResponse({ status: 'success', message: 'تم تسجيل الطلب في Google Sheets' });
+      }
+      return createJsonResponse({ status: 'error', message: 'ورقة الطلبات غير موجودة' });
     }
 
     // 12. إضافة أو تعديل أو حذف أسعار التوصيل
     if (action === 'add_delivery_rate') {
       var dRate = payload.data || payload;
-      var dSheet = ss.getSheetByName('أسعار التوصيل');
+      var dSheet = findSheet(ss, ['أسعار التوصيل', 'اسعار التوصيل', 'التوصيل', 'Delivery', 'Delivery Rates']) || ss.getSheetByName('أسعار التوصيل');
       if (dSheet) {
         var dId = dRate.id || 'rate-' + new Date().getTime();
         dSheet.appendRow([
@@ -567,7 +600,7 @@ function doPost(e) {
     if (action === 'update_delivery_rate') {
       var upRate = payload.data || payload;
       var upRateId = String(payload.id || upRate.id || '').trim();
-      var dSheetUp = ss.getSheetByName('أسعار التوصيل');
+      var dSheetUp = findSheet(ss, ['أسعار التوصيل', 'اسعار التوصيل', 'التوصيل', 'Delivery', 'Delivery Rates']) || ss.getSheetByName('أسعار التوصيل');
       if (dSheetUp) {
         var dRows = dSheetUp.getDataRange().getValues();
         for (var dri = 1; dri < dRows.length; dri++) {
@@ -593,7 +626,7 @@ function doPost(e) {
 
     if (action === 'delete_delivery_rate') {
       var delRateId = String(payload.id || '').trim();
-      var dSheetDel = ss.getSheetByName('أسعار التوصيل');
+      var dSheetDel = findSheet(ss, ['أسعار التوصيل', 'اسعار التوصيل', 'التوصيل', 'Delivery', 'Delivery Rates']) || ss.getSheetByName('أسعار التوصيل');
       if (dSheetDel) {
         var dRowsDel = dSheetDel.getDataRange().getValues();
         for (var drd = 1; drd < dRowsDel.length; drd++) {
@@ -610,7 +643,7 @@ function doPost(e) {
 
     if (action === 'save_delivery_rates' || action === 'sync_delivery_rates') {
       var ratesList = payload.data || payload.rates || [];
-      var dSheetSave = ss.getSheetByName('أسعار التوصيل');
+      var dSheetSave = findSheet(ss, ['أسعار التوصيل', 'اسعار التوصيل', 'التوصيل', 'Delivery', 'Delivery Rates']) || ss.getSheetByName('أسعار التوصيل');
       if (dSheetSave && Array.isArray(ratesList) && ratesList.length > 0) {
         dSheetSave.clearContents();
         var dHeader = ['المعرف (ID)', 'اسم المدينة / المنطقة', 'المنطقة الجغرافية (Zone)', 'سعر التوصيل (د.ل)', 'العرض النصي للسعر', 'الوقت المتوقع للتسليم', 'ملاحظات'];
@@ -702,10 +735,152 @@ function getProductColumnMap(pSheet) {
   return map;
 }
 
+// دالة تحديد وتعيين أعمدة ورقة حسابات ببجي بدقة فائقة
+function getPubgColumnIndices(sheetA) {
+  var cols = {
+    id: 0,
+    ownerName: 1,
+    accountName: 2,
+    level: 3,
+    mythics: 4,
+    powerLevel: 5,
+    goldMythics: 6,
+    weapons: 7,
+    cars: 8,
+    hashtags: 9,
+    linked: 10,
+    price: 11,
+    phone: 12,
+    transferPhone: 13,
+    video: 14,
+    availCol: 17, // 1-based default Q
+    dispCol: 18,  // 1-based default R
+    availIdx: 16, // 0-based default Q
+    dispIdx: 17   // 0-based default R
+  };
+
+  if (!sheetA) return cols;
+
+  var lastCol = sheetA.getLastColumn();
+  if (lastCol >= 1) {
+    var headers = sheetA.getRange(1, 1, 1, lastCol).getValues()[0];
+    var foundAvail = -1;
+    var foundDisp = -1;
+
+    for (var c = 0; c < headers.length; c++) {
+      var h = String(headers[c] || '').trim().toLowerCase();
+      if (!h) continue;
+
+      if (h.indexOf('طابع') > -1 || h.indexOf('معرف') > -1 || h.indexOf('timestamp') > -1 || h.indexOf('id') > -1) cols.id = c;
+      else if (h.indexOf('اسم الثلاثي') > -1 || h.indexOf('الاسم') > -1 || h.indexOf('المالك') > -1) cols.ownerName = c;
+      else if (h.indexOf('اسم الحساب') > -1) cols.accountName = c;
+      else if (h.indexOf('مستوى الحساب') > -1 || h.indexOf('لفل') > -1) cols.level = c;
+      else if (h.indexOf('عدد الميثيك') > -1 || h.indexOf('المثكات') > -1 || h.indexOf('mythic') > -1) {
+        if (h.indexOf('ذهب') > -1) cols.goldMythics = c;
+        else cols.mythics = c;
+      }
+      else if (h.indexOf('مستوى السكنات') > -1 || h.indexOf('الشقة') > -1 || h.indexOf('الروم') > -1) cols.powerLevel = c;
+      else if (h.indexOf('ذهب') > -1 || h.indexOf('gold') > -1) cols.goldMythics = c;
+      else if (h.indexOf('أسلحة') > -1 || h.indexOf('اسلحة') > -1 || h.indexOf('weapons') > -1) cols.weapons = c;
+      else if (h.indexOf('سيارات') > -1 || h.indexOf('cars') > -1) cols.cars = c;
+      else if (h.indexOf('هاشتاج') > -1 || h.indexOf('هاش') > -1) cols.hashtags = c;
+      else if (h.indexOf('ربط') > -1 || h.indexOf('خدمات') > -1) cols.linked = c;
+      else if (h.indexOf('سعر') > -1 || h.indexOf('price') > -1) cols.price = c;
+      else if (h.indexOf('هاتف') > -1 || h.indexOf('phone') > -1) {
+        if (h.indexOf('محول') > -1 || h.indexOf('تحويل') > -1) cols.transferPhone = c;
+        else cols.phone = c;
+      }
+      else if (h.indexOf('فيديو') > -1 || h.indexOf('video') > -1) cols.video = c;
+
+      // كشف عمود العرض في الموقع (R1 أو العمود 18 / 19)
+      if (h.indexOf('عرض') > -1 || h.indexOf('موقع') > -1 || h.indexOf('display') > -1 || h.indexOf('الموقع') > -1) {
+        foundDisp = c;
+      }
+      // كشف عمود التوفر والبيع (Q1 أو العمود 17 / 18)
+      else if (h.indexOf('متاح') > -1 || h.indexOf('بيع') > -1 || h.indexOf('متوفر') > -1 || h.indexOf('avail') > -1 || h.indexOf('sold') > -1) {
+        foundAvail = c;
+      }
+    }
+
+    if (foundAvail > -1) {
+      cols.availIdx = foundAvail;
+      cols.availCol = foundAvail + 1;
+    } else if (lastCol >= 19) {
+      cols.availCol = 18;
+      cols.availIdx = 17;
+    } else {
+      cols.availCol = 17;
+      cols.availIdx = 16;
+    }
+
+    if (foundDisp > -1) {
+      cols.dispIdx = foundDisp;
+      cols.dispCol = foundDisp + 1;
+    } else if (lastCol >= 19) {
+      cols.dispCol = 19;
+      cols.dispIdx = 18;
+    } else {
+      cols.dispCol = 18;
+      cols.dispIdx = 17;
+    }
+  }
+
+  return cols;
+}
+
+// دالة البحث الذكي عن رقم صف حساب ببجي في ورقة جوجل شيت
+function findPubgRowIndex(sheetA, payload, aRows, cols) {
+  var accId = String(payload.id || payload.submissionId || '').trim().toLowerCase();
+  var rowIdx = Number(payload.rowIndex || payload.rowNumber || 0);
+
+  // 1. إذا كان رقم الصف مُرسلاً وصالحاً
+  if (rowIdx > 1 && rowIdx <= aRows.length) {
+    return rowIdx;
+  }
+
+  // 2. مطابقة بالمعرف أو الاسم أو التوقيت أو رقم الهاتف
+  if (accId) {
+    var m = accId.match(/row-(\d+)/i);
+    if (m && m[1]) {
+      var extractedRow = parseInt(m[1], 10);
+      if (extractedRow > 1 && extractedRow <= aRows.length) {
+        return extractedRow;
+      }
+    }
+
+    for (var i = 1; i < aRows.length; i++) {
+      var rId = String(aRows[i][cols.id] || '').trim().toLowerCase();
+      var rName = String(aRows[i][cols.accountName] || '').trim().toLowerCase();
+      var rOwner = String(aRows[i][cols.ownerName] || '').trim().toLowerCase();
+      var rPhone = String(aRows[i][cols.phone] || '').trim().toLowerCase();
+
+      if (rId === accId || (accId && (rName === accId || rOwner === accId || rPhone === accId))) {
+        return i + 1;
+      }
+    }
+  }
+
+  var accData = payload.data || payload;
+  var targetName = String(accData.accountName || accData.title || '').trim().toLowerCase();
+  var targetPhone = String(accData.sellerPhone || accData.phone || '').trim().toLowerCase();
+
+  if (targetName || targetPhone) {
+    for (var j = 1; j < aRows.length; j++) {
+      var rName2 = String(aRows[j][cols.accountName] || '').trim().toLowerCase();
+      var rPhone2 = String(aRows[j][cols.phone] || '').trim().toLowerCase();
+      if ((targetName && rName2 === targetName) || (targetPhone && rPhone2 === targetPhone)) {
+        return j + 1;
+      }
+    }
+  }
+
+  return -1;
+}
+
 // دالة جلب كافة بيانات المتجر وصفحات التواصل من Google Sheets
 function getAllStoreData(ss) {
   // 1. المنتجات
-  var prodSheet = ss.getSheetByName('المنتجات');
+  var prodSheet = findSheet(ss, ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products']) || ss.getSheetByName('المنتجات');
   var prodData = prodSheet ? prodSheet.getDataRange().getValues() : [];
   var products = [];
 
@@ -741,74 +916,84 @@ function getAllStoreData(ss) {
   var pubgAccounts = [];
   var allPubgAccounts = [];
 
-  for (var j = 1; j < accData.length; j++) {
-    var a = accData[j];
-    if (a[0] && (a[1] || a[2])) {
-      // قراءة حالة التوفر والبيع من العمود 17 (الخلية Q1: نعم = متاح للبيع / لا = تم بيع الحساب)
-      var availVal = String(a[16] !== undefined ? a[16] : 'نعم').trim();
-      var isSold = (availVal === 'لا' || availVal === 'تم البيع' || availVal === 'مباع' || availVal.toLowerCase() === 'sold' || availVal.toLowerCase() === 'no');
-      var isAvailable = !isSold;
-      var saleStatus = isSold ? 'تم البيع' : 'متوفر';
+  if (accData.length > 1) {
+    var pCols = getPubgColumnIndices(accSheet);
+    for (var j = 1; j < accData.length; j++) {
+      var a = accData[j];
+      if (a[0] || a[1] || a[2]) {
+        // قراءة حالة التوفر والبيع بدقة ديناميكية (نعم = متاح للبيع / لا = تم بيع الحساب)
+        var availVal = String(a[pCols.availIdx] !== undefined ? a[pCols.availIdx] : 'نعم').trim();
+        var isSold = (availVal === 'لا' || availVal === 'تم البيع' || availVal === 'مباع' || availVal.toLowerCase() === 'sold' || availVal.toLowerCase() === 'no');
+        var isAvailable = !isSold;
+        var saleStatus = isSold ? 'تم البيع' : 'متوفر';
 
-      // قراءة حالة العرض في الموقع من العمود 18 (الخلية R1: نعم = معروض / لا = مخفي)
-      var displayFlag = String(a[17] || 'لا').trim();
-      var isApproved = (displayFlag === 'نعم' || displayFlag.toLowerCase() === 'yes');
-      
-      // البحث بمرونة عن رابط الفيديو
-      var foundVideo = '';
-      for (var colIdx = 13; colIdx < a.length; colIdx++) {
-        var cellVal = String(a[colIdx] || '').trim();
-        if (cellVal.indexOf('http') > -1 && (cellVal.indexOf('drive.google.com') > -1 || cellVal.indexOf('youtu') > -1 || cellVal.indexOf('.mp4') > -1)) {
-          foundVideo = cellVal;
-          break;
+        // قراءة حالة العرض في الموقع بدقة ديناميكية (نعم = معروض / لا = مخفي)
+        var displayFlag = String(a[pCols.dispIdx] !== undefined ? a[pCols.dispIdx] : 'لا').trim();
+        var isApproved = (displayFlag === 'نعم' || displayFlag.toLowerCase() === 'yes' || displayFlag === 'true');
+        
+        // البحث بمرونة فائقة عن رابط الفيديو في أي عمود
+        var foundVideo = String(a[14] || '').trim();
+        if (!foundVideo || (foundVideo.indexOf('http') === -1 && foundVideo.indexOf('drive') === -1)) {
+          for (var colIdx = 0; colIdx < a.length; colIdx++) {
+            var cellVal = String(a[colIdx] || '').trim();
+            if (cellVal.indexOf('http') > -1 && (cellVal.indexOf('drive.google.com') > -1 || cellVal.indexOf('youtu') > -1 || cellVal.indexOf('.mp4') > -1 || cellVal.indexOf('video') > -1)) {
+              foundVideo = cellVal;
+              break;
+            }
+          }
         }
-      }
-      if (!foundVideo) {
-        foundVideo = String(a[15] || '').trim();
-      }
 
-      var accItem = {
-        id: String(a[0]),
-        ownerName: String(a[1] || ''),
-        accountName: String(a[2] || ''),
-        title: String(a[2] || ('حساب PUBG لفل ' + a[3])),
-        badge: isSold ? 'تم البيع' : 'حساب موثق',
-        level: a[3] ? ('LVL ' + String(a[3]).replace(/LVL/i, '').trim()) : 'LVL --',
-        accountLevel: String(a[3] || ''),
-        mythicsCount: String(a[4] || '0'),
-        apartmentLevel: String(a[5] || ''),
-        goldCount: String(a[6] || '0'),
-        upgradableWeaponsCount: String(a[7] || ''),
-        carsCount: String(a[8] || '0'),
-        hashtagsCount: String(a[9] || '0'),
-        linkedServices: String(a[10] || ''),
-        linkedAccounts: String(a[10] || ''),
-        price: Number(a[11]) || 0,
-        salePrice: String(a[11] || '0'),
-        sellerPhone: String(a[12] || ''),
-        sellerName: String(a[1] || ''),
-        transferPhone: String(a[13] || ''),
-        storeReceivePhone: String(a[14] || '0943981577'),
-        image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
-        videoUrl: foundVideo,
-        siteRating: String(a[16] || '5'),
-        displayOnSite: isApproved ? 'نعم' : 'لا',
-        approved: isApproved,
-        isAvailable: isAvailable,
-        isSold: isSold,
-        sold: isSold,
-        saleStatus: saleStatus,
-        features: [
-          (a[4] ? a[4] + ' ميثيك' : 'حساب مميز'),
-          (a[7] ? String(a[7]) : 'أسلحة مطورة'),
-          (isSold ? 'تم بيع هذا الحساب' : 'تسليم آمن ومضمون')
-        ]
-      };
+        var accItem = {
+          id: String(a[0] || ('acc-row-' + (j + 1))),
+          rowIndex: j + 1,
+          rowNumber: j + 1,
+          ownerName: String(a[pCols.ownerName] || a[1] || ''),
+          fullName: String(a[pCols.ownerName] || a[1] || ''),
+          accountName: String(a[pCols.accountName] || a[2] || ''),
+          title: String(a[pCols.accountName] || a[2] || ('حساب PUBG لفل ' + (a[pCols.level] || a[3]))),
+          badge: isSold ? 'تم البيع' : 'حساب موثق',
+          level: a[pCols.level] ? ('LVL ' + String(a[pCols.level]).replace(/LVL/i, '').trim()) : 'LVL --',
+          accountLevel: String(a[pCols.level] || a[3] || ''),
+          mythicsCount: String(a[pCols.mythics] || a[4] || '0'),
+          apartmentLevel: String(a[pCols.powerLevel] || a[5] || ''),
+          powerLevel: String(a[pCols.powerLevel] || a[5] || ''),
+          goldCount: String(a[pCols.goldMythics] || a[6] || '0'),
+          goldenMythicsCount: String(a[pCols.goldMythics] || a[6] || '0'),
+          upgradableWeaponsCount: String(a[pCols.weapons] || a[7] || ''),
+          upgradableWeapons: String(a[pCols.weapons] || a[7] || ''),
+          carsCount: String(a[pCols.cars] || a[8] || '0'),
+          hashtagsCount: String(a[pCols.hashtags] || a[9] || '0'),
+          linkedServices: String(a[pCols.linked] || a[10] || ''),
+          linkedAccounts: String(a[pCols.linked] || a[10] || ''),
+          price: Number(a[pCols.price] || a[11]) || 0,
+          salePrice: String(a[pCols.price] || a[11] || '0'),
+          sellerPhone: String(a[pCols.phone] || a[12] || ''),
+          sellerName: String(a[pCols.ownerName] || a[1] || ''),
+          phone: String(a[pCols.phone] || a[12] || ''),
+          transferPhone: String(a[pCols.transferPhone] || a[13] || ''),
+          storeReceivePhone: '0943981577',
+          image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
+          videoUrl: foundVideo,
+          siteRating: String(a[15] || a[16] || '5'),
+          displayOnSite: isApproved ? 'نعم' : 'لا',
+          approved: isApproved,
+          isAvailable: isAvailable,
+          isSold: isSold,
+          sold: isSold,
+          saleStatus: saleStatus,
+          status: isApproved ? 'approved' : 'pending',
+          features: [
+            ((a[pCols.mythics] || a[4]) ? (a[pCols.mythics] || a[4]) + ' ميثيك' : 'حساب مميز'),
+            ((a[pCols.weapons] || a[7]) ? String(a[pCols.weapons] || a[7]) : 'أسلحة مطورة'),
+            (isSold ? 'تم بيع هذا الحساب' : 'تسليم آمن ومضمون')
+          ]
+        };
 
-      allPubgAccounts.push(accItem);
+        allPubgAccounts.push(accItem);
 
-      if (isApproved) {
-        pubgAccounts.push(accItem);
+        if (isApproved) {
+          pubgAccounts.push(accItem);
+        }
       }
     }
   }
@@ -854,7 +1039,7 @@ function getAllStoreData(ss) {
   };
 
   // قراءة ورقة صفحات التواصل إن وُجدت
-  var socSheet = ss.getSheetByName('صفحات التواصل');
+  var socSheet = findSheet(ss, ['صفحات التواصل', 'روابط التواصل', 'التواصل', 'Social Links', 'Social']) || ss.getSheetByName('صفحات التواصل');
   if (socSheet) {
     var socData = socSheet.getDataRange().getValues();
     for (var sc = 1; sc < socData.length; sc++) {
@@ -884,7 +1069,7 @@ function getAllStoreData(ss) {
   }
 
   // قراءة ورقة إعدادات المتجر العامة
-  var setSheet = ss.getSheetByName('إعدادات المتجر');
+  var setSheet = findSheet(ss, ['Store Setting', 'Store Settings', 'إعدادات المتجر', 'اعدادات المتجر', 'Settings']) || ss.getSheetByName('إعدادات المتجر');
   if (setSheet) {
     var setData = setSheet.getDataRange().getValues();
     for (var s = 1; s < setData.length; s++) {
@@ -899,7 +1084,7 @@ function getAllStoreData(ss) {
   }
 
   // 5. أسعار التوصيل
-  var rateSheet = ss.getSheetByName('أسعار التوصيل');
+  var rateSheet = findSheet(ss, ['أسعار التوصيل', 'اسعار التوصيل', 'التوصيل', 'Delivery', 'Delivery Rates']) || ss.getSheetByName('أسعار التوصيل');
   var deliveryRates = [];
   if (rateSheet) {
     var rateData = rateSheet.getDataRange().getValues();
@@ -930,42 +1115,80 @@ function getAllStoreData(ss) {
   };
 }
 
+// دالة مساعدة شاملة للبحث الذكي والمرن عن الأوراق بجدول Google Sheets وتفادي أي اختلاف في التسمية
+function findSheet(ss, candidates) {
+  if (!ss || !candidates) return null;
+  if (typeof candidates === 'string') candidates = [candidates];
+  // 1. بحث مباشر بالأسماء
+  for (var i = 0; i < candidates.length; i++) {
+    var sh = ss.getSheetByName(candidates[i]);
+    if (sh) return sh;
+  }
+  // 2. بحث مرن يتجاهل الهمزات والمسافات والحروف الكبيرة/الصغيرة والتاء المربوطة
+  var all = ss.getSheets();
+  var normalize = function(str) {
+    return String(str || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_\-]/g, '')
+      .replace(/[أإآ]/g, 'ا')
+      .replace(/ة/g, 'ه')
+      .replace(/ى/g, 'ي');
+  };
+
+  for (var c = 0; c < candidates.length; c++) {
+    var target = normalize(candidates[c]);
+    for (var s = 0; s < all.length; s++) {
+      var sheetName = all[s].getName();
+      var cleanS = normalize(sheetName);
+      if (cleanS === target || cleanS.indexOf(target) > -1 || target.indexOf(cleanS) > -1) {
+        return all[s];
+      }
+    }
+  }
+  return null;
+}
+
 // دالة تجهيز وإعداد الجداول إذا لم تكن موجودة
 function setupSheetsIfMissing(ss) {
   var requiredSheets = [
     {
       name: 'المنتجات',
+      aliases: ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products'],
       headers: ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الشارة (Tag)', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)']
     },
     {
       name: 'حسابات ببجي',
+      aliases: ['حسابات ببجي', 'حسابات ببجى', 'حسابات PUBG', 'PUBG', 'pubg'],
       headers: [
-        'المعرف (ID)', 
-        '1. اسم المالك', 
-        '2. اسم الحساب المراد بيعه', 
-        '3. مستوى الحساب', 
-        '4. عدد المثكات الموجودة', 
-        '5. مستوى الشقة', 
-        '6. عدد مقاييس الذهب', 
-        '7. عدد الأسلحة قيد التطوير', 
-        '8. عدد السيارات', 
-        '9. عدد الهاشتاجات', 
-        '10. خدمات الربط', 
-        '11. سعر بيع الحساب (د.ل)', 
-        '12. رقم هاتف البائع', 
-        '13. رقم الهاتف المحول منه 5 دينار', 
-        '14. رقم الهاتف لتحويل 5 دينار إليه', 
-        '15. فيديو الحساب (أقل من 40 ثانية)', 
-        '16. متاح للبيع؟ (نعم/لا)',
-        '17. هل يتم عرض هذا الحساب على الموقع؟ (نعم/لا)'
+        'الطابع الزمني / المعرف (ID)', 
+        'الاسم الثلاثي', 
+        'اسم الحساب', 
+        'مستوى الحساب', 
+        'عدد الميثيك', 
+        'مستوى السكنات (الشقة/الروم)', 
+        'عدد الميثيك الذهبي', 
+        'عدد الأسلحة المطورة', 
+        'عدد السيارات', 
+        'عدد الهاشتاجات', 
+        'الربط / خدمات الربط', 
+        'السعر (د.ل)', 
+        'رقم الهاتف', 
+        'رقم الهاتف المحول منه 5 دينار', 
+        'فيديو للحساب', 
+        'تقييم للموقع', 
+        'متاح للبيع؟ (نعم/لا)',
+        'هل يتم عرض هذا الحساب على الموقع؟ (نعم/لا)'
       ]
     },
     {
       name: 'باقات الشدات',
+      aliases: ['باقات الشدات', 'باقة شدات والمنتجات', 'باقة شدات', 'شدات ببجي', 'UC Packages', 'UC'],
       headers: ['المعرف (ID)', 'كمية الشدات (UC)', 'شدات إضافية مجانية (Bonus)', 'السعر الأساسي (د.ل)', 'السعر بعد الخصم/الحسم (د.ل)', 'الشارة (Tag)', 'الأكثر طلباً؟ (نعم/لا)', 'متوفر للشحن؟ (نعم/لا)']
     },
     {
       name: 'أسعار التوصيل',
+      aliases: ['أسعار التوصيل', 'اسعار التوصيل', 'التوصيل', 'Delivery', 'Delivery Rates'],
       headers: ['المعرف (ID)', 'اسم المدينة / المنطقة', 'المنطقة الجغرافية (Zone)', 'سعر التوصيل (د.ل)', 'العرض النصي للسعر', 'الوقت المتوقع للتسليم', 'ملاحظات'],
       defaultRows: [
         ['tripoli_central', 'داخل طرابلس (وسط البلد والأحياء الرئيسية)', 'داخل طرابلس', '15 - 20', '15 - 20 د.ل', '24 ساعة', 'سوق الجمعة، عين زارة، تاجوراء، جنزور، حي الأندلس'],
@@ -991,6 +1214,7 @@ function setupSheetsIfMissing(ss) {
     },
     {
       name: 'صفحات التواصل',
+      aliases: ['صفحات التواصل', 'روابط التواصل', 'التواصل', 'Social Links', 'Social'],
       headers: ['المعرف', 'اسم المنصة', 'الرابط المباشر (URL)', 'اسم المعرف/الحساب (@Handle)', 'ملاحظات / رقم الهاتف'],
       defaultRows: [
         ['soc-tiktok', 'TikTok', 'https://www.tiktok.com/@rtg_gear_x', '@rtg_gear_x', 'حساب تيك توك الرسمي'],
@@ -1003,6 +1227,7 @@ function setupSheetsIfMissing(ss) {
     },
     {
       name: 'إعدادات المتجر',
+      aliases: ['Store Setting', 'Store Settings', 'إعدادات المتجر', 'اعدادات المتجر', 'Settings'],
       headers: ['اسم الإعداد', 'القيمة'],
       defaultRows: [
         ['whatsappNumber', '218934590635'],
@@ -1021,12 +1246,13 @@ function setupSheetsIfMissing(ss) {
     },
     {
       name: 'الطلبات الواردة',
+      aliases: ['طلبات الواردة', 'الطلبات الواردة', 'الطلبات', 'طلبات الشراء', 'Orders'],
       headers: ['رقم الطلب', 'التاريخ والوقت', 'نوع الطلب', 'اسم العميل', 'رقم الهاتف', 'المدينة', 'المنطقة', 'طريقة الدفع', 'الإجمالي (د.ل)', 'الحالة', 'تفاصيل العناصر']
     }
   ];
 
   requiredSheets.forEach(function(sInfo) {
-    var sheet = ss.getSheetByName(sInfo.name);
+    var sheet = findSheet(ss, sInfo.aliases || [sInfo.name]);
     if (!sheet) {
       sheet = ss.insertSheet(sInfo.name);
       sheet.appendRow(sInfo.headers);
@@ -1221,7 +1447,36 @@ export class AppsScriptService {
     let lastError: any = null;
 
     for (const testUrl of urlsToTry) {
-      // 1. Try standard GET fetch
+      // 1. Try server-side proxy FIRST (100% reliable, zero CORS, follows Google 302 redirects)
+      try {
+        const fullUrl = testUrl.includes('?') ? `${testUrl}&action=get_all` : `${testUrl}?action=get_all`;
+        const proxyRes = await fetch(`/api/apps-script-proxy?url=${encodeURIComponent(fullUrl)}`);
+        if (proxyRes.ok) {
+          const result = await proxyRes.json();
+          const data = result.data || result;
+
+          if (result.status === 'success' || data.products || data.pubgAccounts || data.ucPackages) {
+            this.saveConfig({ 
+              webAppUrl: testUrl,
+              lastSyncedAt: new Date().toLocaleString('ar-LY') 
+            });
+
+            return {
+              products: Array.isArray(data.products) ? data.products : [],
+              pubgAccounts: Array.isArray(data.pubgAccounts) ? data.pubgAccounts : [],
+              allPubgAccounts: Array.isArray(data.allPubgAccounts) ? data.allPubgAccounts : data.pubgAccounts,
+              pubgSubmissions: Array.isArray(data.pubgSubmissions) ? data.pubgSubmissions : [],
+              ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
+              settings: data.settings || {},
+              deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
+            };
+          }
+        }
+      } catch (proxyErr: any) {
+        lastError = proxyErr;
+      }
+
+      // 2. Try standard GET fetch
       try {
         const fullUrl = testUrl.includes('?') ? `${testUrl}&action=get_all` : `${testUrl}?action=get_all`;
         const res = await fetch(fullUrl, {
@@ -1254,7 +1509,7 @@ export class AppsScriptService {
         lastError = err;
       }
 
-      // 2. Try JSONP fallback (bypasses all browser CORS and origin blocks across all devices)
+      // 3. Try JSONP fallback (bypasses all browser CORS and origin blocks across all devices)
       try {
         const result = await this.loadViaJsonp(testUrl);
         const data = result.data || result;
@@ -1300,19 +1555,21 @@ export class AppsScriptService {
   }
 
   /**
-   * Toggle PUBG account display on website (نعم / كلا)
+   * Toggle PUBG account display on website (نعم / لا)
    */
   public static async setPubgDisplay(
     webAppUrl: string,
     id: string,
-    display: 'نعم' | 'لا' | 'كلا'
+    display: 'نعم' | 'لا' | 'كلا',
+    extraData?: any
   ): Promise<boolean> {
     if (!webAppUrl || !webAppUrl.trim()) return false;
 
     await this.sendPost(webAppUrl, {
       action: 'set_pubg_display',
       id,
-      display: display === 'نعم' ? 'نعم' : 'كلا',
+      display: display === 'نعم' ? 'نعم' : 'لا',
+      ...(extraData || {}),
     });
     return true;
   }
@@ -1323,7 +1580,8 @@ export class AppsScriptService {
   public static async setPubgSold(
     webAppUrl: string,
     id: string,
-    isSold: boolean
+    isSold: boolean,
+    extraData?: any
   ): Promise<boolean> {
     if (!webAppUrl || !webAppUrl.trim()) return false;
 
@@ -1333,6 +1591,8 @@ export class AppsScriptService {
       isSold,
       sold: isSold,
       saleStatus: isSold ? 'تم البيع' : 'متوفر',
+      saleFlag: isSold ? 'لا' : 'نعم',
+      ...(extraData || {}),
     });
     return true;
   }

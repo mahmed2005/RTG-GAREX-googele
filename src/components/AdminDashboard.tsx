@@ -325,17 +325,17 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // 2. Handle PUBG Account Actions (Display in R1: نعم / كلا, Sold in S1: متوفر / تم البيع)
+  // 2. Handle PUBG Account Actions (Display in R1: نعم / لا, Available/Sold in Q1: نعم / لا)
   const handleToggleAccountDisplay = async (accId: string, currentStatus: 'نعم' | 'لا' | 'كلا' | undefined) => {
     const isCurrentlyShown = currentStatus === 'نعم';
-    const newStatus: 'نعم' | 'كلا' = isCurrentlyShown ? 'كلا' : 'نعم';
+    const newStatus: 'نعم' | 'لا' = isCurrentlyShown ? 'لا' : 'نعم';
     try {
       await togglePubgDisplay(accId, newStatus);
       showToast(
         'success',
         newStatus === 'نعم' 
           ? 'تم تسجيل (نعم) في الخلية R1 وعرض الحساب بالموقع فوراً!' 
-          : 'تم تسجيل (كلا) في الخلية R1 وإخفاء الحساب من الموقع بنجاح.'
+          : 'تم تسجيل (لا) في الخلية R1 وإخفاء الحساب من الموقع بنجاح.'
       );
     } catch (err: any) {
       showToast('error', 'حدث خطأ أثناء تحديث حالة عرض الحساب');
@@ -349,8 +349,8 @@ export const AdminDashboard: React.FC = () => {
       showToast(
         'success',
         nextSold
-          ? 'تم تسجيل (تم البيع) في الخلية S1 بنجاح!'
-          : 'تم تسجيل (متوفر) في الخلية S1 وعودة الحساب متاحاً للبيع!'
+          ? 'تم تسجيل (لا) في الخلية Q1 (الحساب مسجل كـ تم البيع وغير متاح للشراء)!'
+          : 'تم تسجيل (نعم) في الخلية Q1 (عادت حالة الحساب متاحاً للشراء بالموقع)!'
       );
     } catch (err: any) {
       showToast('error', 'حدث خطأ أثناء تحديث حالة البيع');
@@ -1130,15 +1130,15 @@ export const AdminDashboard: React.FC = () => {
                             <Edit3 className="w-4 h-4" />
                           </button>
 
-                          {/* 1. Toggle Display Button (نعم / كلا) - Column R1 */}
+                          {/* 1. Toggle Display Button (نعم / لا) - Column R1 */}
                           <button
-                            onClick={() => handleToggleAccountDisplay(acc.id, acc.displayOnSite || (isApproved ? 'نعم' : 'كلا'))}
+                            onClick={() => handleToggleAccountDisplay(acc.id, acc.displayOnSite || (isApproved ? 'نعم' : 'لا'))}
                             className={`px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 ${
                               isApproved
                                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/60'
                                 : 'bg-slate-700 hover:bg-slate-600 text-slate-200 border border-white/10'
                             }`}
-                            title={isApproved ? 'الحساب معروض بالموقع (R1 = نعم). اضغط لإخفائه' : 'الحساب مخفي (R1 = كلا). اضغط لعرضه بالموقع'}
+                            title={isApproved ? 'الحساب معروض بالموقع (الخلية R1 = نعم). اضغط لإخفائه' : 'الحساب مخفي (الخلية R1 = لا). اضغط لعرضه بالموقع'}
                           >
                             {isApproved ? (
                               <>
@@ -1148,12 +1148,12 @@ export const AdminDashboard: React.FC = () => {
                             ) : (
                               <>
                                 <EyeOff className="w-4 h-4 text-slate-400" />
-                                <span>مخفي (كلا) - اضغط للعرض</span>
+                                <span>مخفي (لا) - اضغط للعرض</span>
                               </>
                             )}
                           </button>
 
-                          {/* 2. Toggle Sold Status Button (متوفر / تم البيع) - Column S1 */}
+                          {/* 2. Toggle Sold Status Button (متوفر / تم البيع) - Column Q1 */}
                           <button
                             onClick={() => handleToggleAccountSold(acc.id, isSold)}
                             className={`px-3.5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 ${
@@ -1161,7 +1161,7 @@ export const AdminDashboard: React.FC = () => {
                                 ? 'bg-red-600/25 hover:bg-red-600/35 text-red-300 border border-red-500/40'
                                 : 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30'
                             }`}
-                            title={isSold ? 'الحساب مسجل كـ تم البيع (S1 = تم البيع). اضغط لإعادته متاحاً' : 'الحساب متوفر. اضغط لتحديده كـ تم البيع (S1)'}
+                            title={isSold ? 'الحساب مسجل كـ تم البيع (الخلية Q1 = لا). اضغط لإعادته متاحاً للبيع' : 'الحساب متاح للبيع (الخلية Q1 = نعم). اضغط لتسجيله كـ تم البيع'}
                           >
                             <CheckCircle2 className={`w-4 h-4 ${isSold ? 'text-red-400' : 'text-blue-400'}`} />
                             <span>{isSold ? 'تم البيع' : 'متوفر للبيع'}</span>
@@ -1312,9 +1312,9 @@ export const AdminDashboard: React.FC = () => {
                             ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
                             : 'bg-red-500/15 text-red-300 border-red-500/30 hover:bg-red-500/25'
                         }`}
-                        title="تغيير توفر الباقة للشحن (العمود I1)"
+                        title="تغيير توفر الباقة للشحن في Google Sheets (العمود H1 - العمود رقم 8)"
                       >
-                        {pkg.isAvailable !== false ? 'متوفر للشحن' : 'غير متوفر'}
+                        {pkg.isAvailable !== false ? 'متوفر للشحن (نعم)' : 'غير متوفر (لا)'}
                       </button>
                     </div>
                     <div className="flex items-center gap-1.5">

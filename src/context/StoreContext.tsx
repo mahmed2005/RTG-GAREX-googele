@@ -840,10 +840,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Toggle PUBG Account Display on website ("نعم" / "كلا")
+  // Toggle PUBG Account Display on website ("نعم" / "لا")
   const togglePubgDisplay = async (id: string, newDisplay: 'نعم' | 'لا' | 'كلا') => {
     const isApproved = newDisplay === 'نعم';
-    const displayValue: 'نعم' | 'كلا' = isApproved ? 'نعم' : 'كلا';
+    const displayValue: 'نعم' | 'لا' = isApproved ? 'نعم' : 'لا';
+    const target = allPubgAccounts.find((a) => a.id === id);
 
     // 1. Update allPubgAccounts
     setAllPubgAccounts((prev) =>
@@ -863,7 +864,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // 2. Update pubgAccounts (Visible on public site)
     setPubgAccounts((prev) => {
       if (isApproved) {
-        const target = allPubgAccounts.find((a) => a.id === id);
         if (target) {
           const approvedAcc: PubgAccount = {
             ...target,
@@ -887,7 +887,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
       try {
-        await AppsScriptService.setPubgDisplay(appsScriptConfig.webAppUrl, id, displayValue);
+        await AppsScriptService.setPubgDisplay(appsScriptConfig.webAppUrl, id, displayValue, {
+          rowIndex: target?.rowIndex,
+          rowNumber: target?.rowNumber,
+          accountName: target?.accountName || target?.title,
+          phone: target?.sellerPhone || target?.phone,
+        });
       } catch (err) {
         console.error('Error toggling PUBG account display in Google Sheets:', err);
       }
@@ -897,6 +902,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Toggle PUBG Account Sold Status ("متوفر" / "تم البيع")
   const togglePubgSold = async (id: string, isSold: boolean) => {
     const saleStatus = isSold ? 'تم البيع' : 'متوفر';
+    const target = allPubgAccounts.find((a) => a.id === id);
 
     // 1. Update allPubgAccounts
     setAllPubgAccounts((prev) =>
@@ -934,7 +940,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const appsScriptConfig = AppsScriptService.getConfig();
     if (appsScriptConfig.webAppUrl) {
       try {
-        await AppsScriptService.setPubgSold(appsScriptConfig.webAppUrl, id, isSold);
+        await AppsScriptService.setPubgSold(appsScriptConfig.webAppUrl, id, isSold, {
+          rowIndex: target?.rowIndex,
+          rowNumber: target?.rowNumber,
+          accountName: target?.accountName || target?.title,
+          phone: target?.sellerPhone || target?.phone,
+        });
       } catch (err) {
         console.error('Error toggling PUBG sold status in Google Sheets:', err);
       }
