@@ -43,7 +43,7 @@ import {
 type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'delivery_rates' | 'categories' | 'admin_security' | 'social_contact' | 'sheets_sync';
 
 interface DeleteItemState {
-  type: 'product' | 'pubg_account' | 'pubg_uc';
+  type: 'product' | 'pubg_account' | 'pubg_uc' | 'category';
   id: string;
   name: string;
 }
@@ -255,6 +255,9 @@ export const AdminDashboard: React.FC = () => {
       } else if (itemToDelete.type === 'pubg_uc') {
         deleteUcPackage(itemToDelete.id);
         showToast('success', `تم حذف باقة الشدات "${itemToDelete.name}" نهائياً من الموقع وجدول Google Sheets`);
+      } else if (itemToDelete.type === 'category') {
+        await deleteCategory(itemToDelete.name);
+        showToast('success', `تم حذف قسم "${itemToDelete.name}" وتحديث جدول Google Sheets (ورقة تصنيفات المنتجات) بنجاح!`);
       }
       setItemToDelete(null);
     } catch (err: any) {
@@ -302,24 +305,16 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteCategory = async (catName: string) => {
+  const handleDeleteCategory = (catName: string) => {
     if (catName === 'الكل') {
       showToast('error', 'لا يمكن حذف قسم "الكل" الأساسي');
       return;
     }
-    const linkedProds = products.filter((p) => p.category === catName);
-    const confirmMessage = linkedProds.length > 0
-      ? `هناك ${linkedProds.length} منتج مسجل ضمن قسم "${catName}". هل تريد حقاً حذفه من المتجر وجوجل شيت؟`
-      : `هل أنت متأكد من حذف قسم "${catName}"؟`;
-    
-    if (!window.confirm(confirmMessage)) return;
-
-    const success = await deleteCategory(catName);
-    if (success) {
-      showToast('success', `تم حذف قسم "${catName}" وتحديث Google Sheets بنجاح!`);
-    } else {
-      showToast('error', 'تعذر حذف التصنيف');
-    }
+    setItemToDelete({
+      type: 'category',
+      id: catName,
+      name: catName,
+    });
   };
 
   const handleManualSaveCategories = async () => {
@@ -341,11 +336,8 @@ export const AdminDashboard: React.FC = () => {
   // Admin Security Handlers (OK button + Google Sheets Save)
   const handleSaveAdminCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentAdminPass) {
-      showToast('error', 'يرجى إدخال كلمة المرور الحالية لتأكيد التغيير');
-      return;
-    }
-    if (!newAdminUser.trim()) {
+    const cleanUser = newAdminUser.trim() || currentAdminUser.trim() || adminCredentials?.username || 'admin';
+    if (!cleanUser) {
       showToast('error', 'يرجى إدخال اسم المستخدم الجديد');
       return;
     }
@@ -366,18 +358,19 @@ export const AdminDashboard: React.FC = () => {
     try {
       const res = await updateAdminCredentials(
         currentAdminUser.trim() || adminCredentials?.username || 'admin',
-        currentAdminPass,
-        newAdminUser.trim(),
+        currentAdminPass || '',
+        cleanUser,
         newAdminPass
       );
       if (res.success) {
         setCurrentAdminPass('');
         setNewAdminPass('');
         setConfirmAdminPass('');
-        setCurrentAdminUser(newAdminUser.trim());
-        showToast('success', '✓ تم تغيير وحفظ بيانات دخول الأدمن الجديدة في Google Sheets بنجاح! يمكنك الآن تسجيل الدخول بها.');
+        setCurrentAdminUser(cleanUser);
+        setNewAdminUser(cleanUser);
+        showToast('success', '✓ تم حفظ وتحديث بيانات دخول الأدمن الجديدة في ورقة «أمان الأدمن» بـ Google Sheets بنجاح!');
       } else {
-        showToast('error', res.message || 'كلمة المرور الحالية غير صحيحة، تعذر الحفظ');
+        showToast('error', res.message || 'تعذر حفظ بيانات الدخول');
       }
     } catch (err: any) {
       showToast('error', 'حدث خطأ أثناء حفظ بيانات الدخول في Google Sheets: ' + (err.message || ''));
@@ -1895,7 +1888,7 @@ export const AdminDashboard: React.FC = () => {
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="text-xs font-bold text-slate-300">
-                        كلمة المرور الحالية للتأكيد *
+                        كلمة المرور الحالية (اختياري)
                       </label>
                       <button
                         type="button"
@@ -1908,10 +1901,9 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                     <input
                       type={showCurrentPass ? 'text' : 'password'}
-                      required
                       value={currentAdminPass}
                       onChange={(e) => setCurrentAdminPass(e.target.value)}
-                      placeholder="أدخل كلمة المرور الحالية"
+                      placeholder="أدخل كلمة المرور الحالية (اختياري)"
                       className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
                     />
                   </div>
@@ -1976,7 +1968,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
                   <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-                    <span>يتم حفظ البيانات مباشرة في ورقة "إعدادات المتجر" بـ Google Sheets لتبقى دائمة.</span>
+                    <span>يتم حفظ البيانات مباشرة في ورقة "أمان الأدمن" بـ Google Sheets لتبقى دائمة ومتاحة للدخول من أي جهاز.</span>
                   </div>
 
                   <button
@@ -2123,6 +2115,7 @@ export const AdminDashboard: React.FC = () => {
                     {itemToDelete.type === 'product' && '📦 منتج متجر'}
                     {itemToDelete.type === 'pubg_account' && '🎮 حساب PUBG Mobile'}
                     {itemToDelete.type === 'pubg_uc' && '⚡ باقة شدات UC'}
+                    {itemToDelete.type === 'category' && '🏷️ تصنيف / قسم منتجات'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-slate-300">

@@ -674,7 +674,7 @@ function doPost(e) {
       }
 
       // 1. التخزين في الورقة المخصصة: "أمان الأدمن"
-      var admSheet = findSheet(ss, ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان']) || ss.getSheetByName('أمان الأدمن');
+      var admSheet = findSheet(ss, ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان', 'أمان الادمن']) || ss.getSheetByName('أمان الأدمن');
       if (!admSheet) {
         admSheet = ss.insertSheet('أمان الأدمن');
         var admHead = ['المعرف (ID)', 'اسم المستخدم (Username)', 'كلمة المرور (Password)', 'آخر تحديث (Last Updated)', 'ملاحظات'];
@@ -682,31 +682,54 @@ function doPost(e) {
         admSheet.getRange(1, 1, 1, admHead.length).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
       }
 
-      var admRows = admSheet.getDataRange().getValues();
       var nowTime = new Date().toLocaleString('ar-LY');
+      var admCols = getAdminColumnIndices(admSheet);
+      var admRows = admSheet.getDataRange().getValues();
+
       if (admRows.length > 1) {
-        // تحديث الصف الثاني (بيانات الأدمن الأساسية)
-        admSheet.getRange(2, 1, 1, 5).setValues([['admin-1', admUser, admPass, nowTime, 'تم الحفظ والمزامنة التلقائية من لوحة التحكم']]);
+        // تحديث الصف الثاني
+        admSheet.getRange(2, admCols.userCol).setValue(admUser);
+        admSheet.getRange(2, admCols.passCol).setValue(admPass);
+        if (admCols.timeCol > 0 && admCols.timeCol <= admSheet.getLastColumn()) {
+          admSheet.getRange(2, admCols.timeCol).setValue(nowTime);
+        }
+        if (admCols.notesCol > 0 && admCols.notesCol <= admSheet.getLastColumn()) {
+          admSheet.getRange(2, admCols.notesCol).setValue('تم الحفظ والمزامنة التلقائية من لوحة التحكم');
+        }
       } else {
-        admSheet.appendRow(['admin-1', admUser, admPass, nowTime, 'بيانات دخول الأدمن الرئيسية للمتجر']);
+        var newRow = [];
+        var maxCols = Math.max(admSheet.getLastColumn(), 5);
+        for (var nri = 0; nri < maxCols; nri++) newRow.push('');
+        newRow[admCols.idCol - 1] = 'admin-1';
+        newRow[admCols.userCol - 1] = admUser;
+        newRow[admCols.passCol - 1] = admPass;
+        if (admCols.timeCol <= maxCols) newRow[admCols.timeCol - 1] = nowTime;
+        if (admCols.notesCol <= maxCols) newRow[admCols.notesCol - 1] = 'بيانات دخول الأدمن الرئيسية للمتجر';
+        admSheet.appendRow(newRow);
       }
 
-      // 2. وأيضاً حفظها في ورقة إعدادات المتجر كنسخة احتياطية
-      var setSheetA = findSheet(ss, ['Store Setting', 'Store Settings', 'إعدادات المتجر', 'اعدادات المتجر', 'Settings']) || ss.getSheetByName('إعدادات المتجر');
-      if (setSheetA) {
-        var sData = setSheetA.getDataRange().getValues();
-        var userRow = -1;
-        var passRow = -1;
-        for (var si = 1; si < sData.length; si++) {
-          var k = String(sData[si][0] || '').trim();
-          if (k === 'adminUsername') userRow = si + 1;
-          if (k === 'adminPassword') passRow = si + 1;
-        }
-        if (userRow > 0) setSheetA.getRange(userRow, 2).setValue(admUser);
-        else setSheetA.appendRow(['adminUsername', admUser]);
+      // 2. حفظها أيضاً في ورقتي إعدادات المتجر وإدارة المتجر كنسخة احتياطية
+      var setSheetsAdm = [
+        findSheet(ss, ['إعدادات المتجر', 'اعدادات المتجر', 'Store Setting', 'Store Settings', 'Settings']),
+        findSheet(ss, ['إدارة المتجر', 'ادارة المتجر', 'Store Management', 'Management'])
+      ];
+      for (var sIdx = 0; sIdx < setSheetsAdm.length; sIdx++) {
+        var sSheetItem = setSheetsAdm[sIdx];
+        if (sSheetItem) {
+          var sData = sSheetItem.getDataRange().getValues();
+          var userRow = -1;
+          var passRow = -1;
+          for (var si = 1; si < sData.length; si++) {
+            var k = String(sData[si][0] || '').trim();
+            if (k === 'adminUsername') userRow = si + 1;
+            if (k === 'adminPassword') passRow = si + 1;
+          }
+          if (userRow > 0) sSheetItem.getRange(userRow, 2).setValue(admUser);
+          else sSheetItem.appendRow(['adminUsername', admUser]);
 
-        if (passRow > 0) setSheetA.getRange(passRow, 2).setValue(admPass);
-        else setSheetA.appendRow(['adminPassword', admPass]);
+          if (passRow > 0) sSheetItem.getRange(passRow, 2).setValue(admPass);
+          else sSheetItem.appendRow(['adminPassword', admPass]);
+        }
       }
 
       return createJsonResponse({ 
@@ -1306,13 +1329,14 @@ function getAllStoreData(ss) {
   // 7. بيانات دخول الأدمن (Admin Credentials) من ورقة "أمان الأدمن" المخصصة
   var adminUsername = 'admin';
   var adminPassword = 'rtg2026';
-  var admSheetRead = findSheet(ss, ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان']);
+  var admSheetRead = findSheet(ss, ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان', 'أمان الادمن']);
   if (admSheetRead) {
+    var admColsR = getAdminColumnIndices(admSheetRead);
     var admData = admSheetRead.getDataRange().getValues();
     if (admData.length > 1) {
       for (var ai = 1; ai < admData.length; ai++) {
-        var u = String(admData[ai][1] || '').trim();
-        var p = String(admData[ai][2] || '').trim();
+        var u = String(admData[ai][admColsR.userCol - 1] || '').trim();
+        var p = String(admData[ai][admColsR.passCol - 1] || '').trim();
         if (u && p) {
           adminUsername = u;
           adminPassword = p;
@@ -1335,6 +1359,64 @@ function getAllStoreData(ss) {
     categories: categories,
     adminCredentials: { username: adminUsername, password: adminPassword }
   };
+}
+
+// دالة مساعدة لتحديد أعمدة ورقة "أمان الأدمن" بمرونة فائقة
+function getAdminColumnIndices(sheet) {
+  var cols = {
+    idCol: 1,
+    userCol: 2,
+    passCol: 3,
+    timeCol: 4,
+    notesCol: 5
+  };
+  if (!sheet) return cols;
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return cols;
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var foundUser = -1;
+  var foundPass = -1;
+  for (var c = 0; c < headers.length; c++) {
+    var h = String(headers[c] || '').trim().toLowerCase();
+    if (!h) continue;
+    if (h.indexOf('معرف') > -1 || h.indexOf('id') > -1) cols.idCol = c + 1;
+    else if (h.indexOf('مستخدم') > -1 || h.indexOf('user') > -1 || h.indexOf('اسم') > -1) foundUser = c + 1;
+    else if (h.indexOf('مرور') > -1 || h.indexOf('pass') > -1 || h.indexOf('كلمة') > -1) foundPass = c + 1;
+    else if (h.indexOf('تحديث') > -1 || h.indexOf('تاريخ') > -1 || h.indexOf('time') > -1) cols.timeCol = c + 1;
+    else if (h.indexOf('ملاحظ') > -1 || h.indexOf('note') > -1) cols.notesCol = c + 1;
+  }
+  if (foundUser > -1) cols.userCol = foundUser;
+  if (foundPass > -1) cols.passCol = foundPass;
+  return cols;
+}
+
+// قائمة مخصصة عند فتح ملف جوجل شيت للتأكد من وجود كافة الأوراق فوراً
+function onOpen() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  setupSheetsIfMissing(ss);
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('⚡ متجر RTG Gear X')
+      .addItem('📁 فحص وتجهيز الأوراق الـ 10 (تصنيفات المنتجات، أمان الأدمن)', 'menuSetupSheets')
+      .addItem('🔄 فحص ومزامنة كافة بيانات المتجر', 'menuSyncAll')
+      .addToUi();
+  } catch(e) {}
+}
+
+function menuSetupSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  setupSheetsIfMissing(ss);
+  try {
+    SpreadsheetApp.getUi().alert('✅ تم فحص وتجهيز كافة أوراق المتجر الـ 10 بنجاح!\nبما في ذلك ورقة «تصنيفات المنتجات» و«أمان الأدمن».');
+  } catch(e) {}
+}
+
+function menuSyncAll() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  setupSheetsIfMissing(ss);
+  try {
+    SpreadsheetApp.getUi().alert('✅ تم فحص وتحديث جدول البيانات بنجاح! المتجر متصل وجاهز.');
+  } catch(e) {}
 }
 
 // دالة مساعدة شاملة للبحث الذكي والمرن عن الأوراق بجدول Google Sheets وتفادي أي اختلاف في التسمية
@@ -1371,22 +1453,9 @@ function findSheet(ss, candidates) {
   return null;
 }
 
-// دالة تجهيز وإعداد الجداول إذا لم تكن موجودة
+// دالة تجهيز وإعداد الجداول إذا لم تكن موجودة (الأوراق الـ 10 الكاملة)
 function setupSheetsIfMissing(ss) {
   var requiredSheets = [
-    {
-      name: 'أمان الأدمن',
-      aliases: ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان'],
-      headers: ['المعرف (ID)', 'اسم المستخدم (Username)', 'كلمة المرور (Password)', 'آخر تحديث (Last Updated)', 'ملاحظات'],
-      defaultRows: [
-        ['admin-1', 'admin', 'rtg2026', new Date().toLocaleString('ar-LY'), 'بيانات دخول الأدمن الرئيسية للمتجر']
-      ]
-    },
-    {
-      name: 'المنتجات',
-      aliases: ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products'],
-      headers: ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الشارة (Tag)', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)']
-    },
     {
       name: 'حسابات ببجي',
       aliases: ['حسابات ببجي', 'حسابات ببجى', 'حسابات PUBG', 'PUBG', 'pubg'],
@@ -1412,9 +1481,12 @@ function setupSheetsIfMissing(ss) {
       ]
     },
     {
-      name: 'باقات الشدات',
-      aliases: ['باقات الشدات', 'باقة شدات والمنتجات', 'باقة شدات', 'شدات ببجي', 'UC Packages', 'UC'],
-      headers: ['المعرف (ID)', 'كمية الشدات (UC)', 'شدات إضافية مجانية (Bonus)', 'السعر الأساسي (د.ل)', 'السعر بعد الخصم/الحسم (د.ل)', 'الشارة (Tag)', 'الأكثر طلباً؟ (نعم/لا)', 'متوفر للشحن؟ (نعم/لا)']
+      name: 'أمان الأدمن',
+      aliases: ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان', 'أمان الادمن'],
+      headers: ['المعرف (ID)', 'اسم المستخدم (Username)', 'كلمة المرور (Password)', 'آخر تحديث (Last Updated)', 'ملاحظات'],
+      defaultRows: [
+        ['admin-1', 'admin', 'rtg2026', new Date().toLocaleString('ar-LY'), 'بيانات دخول الأدمن الرئيسية للمتجر']
+      ]
     },
     {
       name: 'أسعار التوصيل',
@@ -1443,6 +1515,16 @@ function setupSheetsIfMissing(ss) {
       ]
     },
     {
+      name: 'باقات شتات',
+      aliases: ['باقات شتات', 'باقة شتات', 'باقات الشدات', 'باقة شدات والمنتجات', 'باقة شدات', 'شدات ببجي', 'UC Packages', 'UC'],
+      headers: ['المعرف (ID)', 'كمية الشدات (UC)', 'شدات إضافية مجانية (Bonus)', 'السعر الأساسي (د.ل)', 'السعر بعد الخصم/الحسم (د.ل)', 'الشارة (Tag)', 'الأكثر طلباً؟ (نعم/لا)', 'متوفر للشحن؟ (نعم/لا)']
+    },
+    {
+      name: 'المنتجات',
+      aliases: ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products'],
+      headers: ['المعرف (ID)', 'اسم المنتج', 'التصنيف', 'السعر (د.ل)', 'السعر القديم', 'رابط الصورة', 'الشارة (Tag)', 'الوصف', 'متوفر؟ (نعم/لا)', 'مميز؟ (نعم/لا)']
+    },
+    {
       name: 'صفحات التواصل',
       aliases: ['صفحات التواصل', 'روابط التواصل', 'التواصل', 'Social Links', 'Social'],
       headers: ['المعرف', 'اسم المنصة', 'الرابط المباشر (URL)', 'اسم المعرف/الحساب (@Handle)', 'ملاحظات / رقم الهاتف'],
@@ -1454,6 +1536,21 @@ function setupSheetsIfMissing(ss) {
         ['soc-phone', 'Phone (هاتف الدعم)', 'tel:0934590635', '0934590635', 'رقم الاتصال المباشر'],
         ['soc-transfer', 'Transfer Phone (رقم تحويل 5 دينار)', 'tel:0943981577', '0943981577', 'رقم استلام رسوم العرض']
       ]
+    },
+    {
+      name: 'إدارة المتجر',
+      aliases: ['إدارة المتجر', 'ادارة المتجر', 'Store Management', 'Management'],
+      headers: ['المعرف', 'الإعداد', 'القيمة', 'ملاحظات'],
+      defaultRows: [
+        ['mgt-1', 'adminUsername', 'admin', 'اسم مستخدم الأدمن'],
+        ['mgt-2', 'adminPassword', 'rtg2026', 'كلمة مرور الأدمن'],
+        ['mgt-3', 'storeName', 'RTG Gear X', 'اسم المتجر']
+      ]
+    },
+    {
+      name: 'الطلبات الواردة',
+      aliases: ['طلبات الواردة', 'الطلبات الواردة', 'الطلبات', 'طلبات الشراء', 'Orders'],
+      headers: ['رقم الطلب', 'التاريخ والوقت', 'نوع الطلب', 'اسم العميل', 'رقم الهاتف', 'المدينة', 'المنطقة', 'طريقة الدفع', 'الإجمالي (د.ل)', 'الحالة', 'تفاصيل العناصر']
     },
     {
       name: 'إعدادات المتجر',
@@ -1491,11 +1588,6 @@ function setupSheetsIfMissing(ss) {
         ['cat-8', 'ماوس', new Date().toLocaleString('ar-LY')],
         ['cat-9', 'إكسسوارات', new Date().toLocaleString('ar-LY')]
       ]
-    },
-    {
-      name: 'الطلبات الواردة',
-      aliases: ['طلبات الواردة', 'الطلبات الواردة', 'الطلبات', 'طلبات الشراء', 'Orders'],
-      headers: ['رقم الطلب', 'التاريخ والوقت', 'نوع الطلب', 'اسم العميل', 'رقم الهاتف', 'المدينة', 'المنطقة', 'طريقة الدفع', 'الإجمالي (د.ل)', 'الحالة', 'تفاصيل العناصر']
     }
   ];
 

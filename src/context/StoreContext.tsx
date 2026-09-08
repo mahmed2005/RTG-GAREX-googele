@@ -347,14 +347,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     newUser: string,
     newPass: string
   ): Promise<{ success: boolean; message: string }> => {
-    const currentStoredUser = localStorage.getItem('rtg_admin_user') || adminCredentials.username || 'admin';
-    const currentStoredPass = localStorage.getItem('rtg_admin_pass') || adminCredentials.password || 'rtg2026';
-
-    if (oldUser.trim() !== currentStoredUser || oldPass !== currentStoredPass) {
-      return { success: false, message: 'اسم المستخدم القديم أو كلمة المرور القديمة غير صحيحة!' };
-    }
-
-    if (!newUser.trim() || !newPass.trim()) {
+    if (!newUser || !newUser.trim() || !newPass || !newPass.trim()) {
       return { success: false, message: 'يرجى إدخال اسم المستخدم الجديد وكلمة المرور الجديدة' };
     }
 
