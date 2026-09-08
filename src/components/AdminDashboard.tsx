@@ -33,10 +33,14 @@ import {
   Truck,
   Sparkles,
   Edit3,
-  Save
+  Save,
+  Layers,
+  KeyRound,
+  Lock,
+  FolderPlus
 } from 'lucide-react';
 
-type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'delivery_rates' | 'social_contact' | 'sheets_sync';
+type AdminTab = 'products' | 'pubg_accounts' | 'pubg_uc' | 'delivery_rates' | 'categories' | 'admin_security' | 'social_contact' | 'sheets_sync';
 
 interface DeleteItemState {
   type: 'product' | 'pubg_account' | 'pubg_uc';
@@ -69,10 +73,30 @@ export const AdminDashboard: React.FC = () => {
     refreshFromAppsScript,
     isAppsScriptSyncing,
     setPreviewVideoUrl,
+    categories,
+    addCategory,
+    deleteCategory,
+    saveCategoriesToSheets,
+    adminCredentials,
+    updateAdminCredentials,
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('products');
   const [toastMsg, setToastMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Category Management State
+  const [newCatInput, setNewCatInput] = useState('');
+  const [isSavingCategories, setIsSavingCategories] = useState(false);
+
+  // Admin Security Management State
+  const [currentAdminUser, setCurrentAdminUser] = useState(adminCredentials?.username || 'admin');
+  const [currentAdminPass, setCurrentAdminPass] = useState('');
+  const [newAdminUser, setNewAdminUser] = useState(adminCredentials?.username || 'admin');
+  const [newAdminPass, setNewAdminPass] = useState('');
+  const [confirmAdminPass, setConfirmAdminPass] = useState('');
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [isSavingCredentials, setIsSavingCredentials] = useState(false);
 
   // Deletion Confirmation Modal State
   const [itemToDelete, setItemToDelete] = useState<DeleteItemState | null>(null);
@@ -258,6 +282,107 @@ export const AdminDashboard: React.FC = () => {
       showToast('error', 'تعذر حفظ الروابط: ' + (err.message || 'خطأ في الاتصال'));
     } finally {
       setIsSavingSocial(false);
+    }
+  };
+
+  // Category Handlers
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = newCatInput.trim();
+    if (!cleanName) {
+      showToast('error', 'يرجى كتابة اسم التصنيف أو القسم الجديد');
+      return;
+    }
+    const success = await addCategory(cleanName);
+    if (success) {
+      setNewCatInput('');
+      showToast('success', `تمت إضافة قسم "${cleanName}" بنجاح وحفظه في Google Sheets!`);
+    } else {
+      showToast('error', 'حدث خطأ أثناء إضافة التصنيف، قد يكون القسم موجوداً بالفعل');
+    }
+  };
+
+  const handleDeleteCategory = async (catName: string) => {
+    if (catName === 'الكل') {
+      showToast('error', 'لا يمكن حذف قسم "الكل" الأساسي');
+      return;
+    }
+    const linkedProds = products.filter((p) => p.category === catName);
+    const confirmMessage = linkedProds.length > 0
+      ? `هناك ${linkedProds.length} منتج مسجل ضمن قسم "${catName}". هل تريد حقاً حذفه من المتجر وجوجل شيت؟`
+      : `هل أنت متأكد من حذف قسم "${catName}"؟`;
+    
+    if (!window.confirm(confirmMessage)) return;
+
+    const success = await deleteCategory(catName);
+    if (success) {
+      showToast('success', `تم حذف قسم "${catName}" وتحديث Google Sheets بنجاح!`);
+    } else {
+      showToast('error', 'تعذر حذف التصنيف');
+    }
+  };
+
+  const handleManualSaveCategories = async () => {
+    setIsSavingCategories(true);
+    try {
+      const ok = await saveCategoriesToSheets(categories);
+      if (ok) {
+        showToast('success', 'تم حفظ ومزامنة كافة أقسام وتصنيفات المنتجات في Google Sheets بنجاح!');
+      } else {
+        showToast('error', 'تعذر حفظ التصنيفات، يرجى التأكد من ربط Google Apps Script');
+      }
+    } catch {
+      showToast('error', 'حدث خطأ أثناء حفظ التصنيفات في Google Sheets');
+    } finally {
+      setIsSavingCategories(false);
+    }
+  };
+
+  // Admin Security Handlers (OK button + Google Sheets Save)
+  const handleSaveAdminCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentAdminPass) {
+      showToast('error', 'يرجى إدخال كلمة المرور الحالية لتأكيد التغيير');
+      return;
+    }
+    if (!newAdminUser.trim()) {
+      showToast('error', 'يرجى إدخال اسم المستخدم الجديد');
+      return;
+    }
+    if (!newAdminPass) {
+      showToast('error', 'يرجى إدخال كلمة المرور الجديدة');
+      return;
+    }
+    if (newAdminPass !== confirmAdminPass) {
+      showToast('error', 'كلمة المرور الجديدة وتأكيدها غير متطابقين');
+      return;
+    }
+    if (newAdminPass.length < 4) {
+      showToast('error', 'يجب أن تتكون كلمة المرور من 4 خانات على الأقل');
+      return;
+    }
+
+    setIsSavingCredentials(true);
+    try {
+      const res = await updateAdminCredentials(
+        currentAdminUser.trim() || adminCredentials?.username || 'admin',
+        currentAdminPass,
+        newAdminUser.trim(),
+        newAdminPass
+      );
+      if (res.success) {
+        setCurrentAdminPass('');
+        setNewAdminPass('');
+        setConfirmAdminPass('');
+        setCurrentAdminUser(newAdminUser.trim());
+        showToast('success', '✓ تم تغيير وحفظ بيانات دخول الأدمن الجديدة في Google Sheets بنجاح! يمكنك الآن تسجيل الدخول بها.');
+      } else {
+        showToast('error', res.message || 'كلمة المرور الحالية غير صحيحة، تعذر الحفظ');
+      }
+    } catch (err: any) {
+      showToast('error', 'حدث خطأ أثناء حفظ بيانات الدخول في Google Sheets: ' + (err.message || ''));
+    } finally {
+      setIsSavingCredentials(false);
     }
   };
 
@@ -523,78 +648,102 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* 6 Main Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-8">
+        {/* 8 Main Tabs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5 mb-8">
           <button
             onClick={() => setActiveTab('products')}
-            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+            className={`p-3 sm:p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border ${
               activeTab === 'products'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <ShoppingBag className="w-4 h-4 flex-shrink-0" />
-            <span>المنتجات ({products.length})</span>
+            <ShoppingBag className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">المنتجات ({products.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('pubg_accounts')}
-            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+            className={`p-3 sm:p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border ${
               activeTab === 'pubg_accounts'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Gamepad2 className="w-4 h-4 flex-shrink-0" />
-            <span>حسابات ببجي ({displayedPubgAccounts.length})</span>
+            <Gamepad2 className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">حسابات ببجي ({displayedPubgAccounts.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('pubg_uc')}
-            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+            className={`p-3 sm:p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border ${
               activeTab === 'pubg_uc'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Zap className="w-4 h-4 flex-shrink-0" />
-            <span>باقات الشدات ({ucPackages.length})</span>
+            <Zap className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">شدات UC ({ucPackages.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('delivery_rates')}
-            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+            className={`p-3 sm:p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border ${
               activeTab === 'delivery_rates'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Truck className="w-4 h-4 flex-shrink-0" />
-            <span>أسعار التوصيل ({deliveryRates.length})</span>
+            <Truck className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">التوصيل ({deliveryRates.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('categories')}
+            className={`p-3 sm:p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border ${
+              activeTab === 'categories'
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
+                : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 flex-shrink-0 text-amber-400" />
+            <span className="truncate">التصنيفات ({categories.filter(c => c !== 'الكل').length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('admin_security')}
+            className={`p-3 sm:p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border ${
+              activeTab === 'admin_security'
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
+                : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
+            <span className="truncate">أمان الأدمن</span>
           </button>
 
           <button
             onClick={() => setActiveTab('social_contact')}
-            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+            className={`p-3 sm:p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border ${
               activeTab === 'social_contact'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Share2 className="w-4 h-4 flex-shrink-0" />
-            <span>صفحات التواصل</span>
+            <Share2 className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">صفحات التواصل</span>
           </button>
 
           <button
             onClick={() => setActiveTab('sheets_sync')}
-            className={`p-3.5 sm:p-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border ${
+            className={`p-3 sm:p-3.5 rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border ${
               activeTab === 'sheets_sync'
                 ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-950/60'
                 : 'bg-[#12141e] text-slate-300 border-white/10 hover:bg-white/5'
             }`}
           >
-            <Link2 className="w-4 h-4 flex-shrink-0" />
-            <span>كود Apps Script</span>
+            <Link2 className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">ربط الشيت</span>
           </button>
         </div>
 
@@ -642,15 +791,12 @@ export const AdminDashboard: React.FC = () => {
                       onChange={(e) => setProductForm({ ...productForm, category: e.target.value as Category })}
                       className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
                     >
-                      <option value="كاميرات مراقبة">كاميرات مراقبة</option>
-                      <option value="سماعات">سماعات</option>
-                      <option value="كيبورد">كيبوردات</option>
-                      <option value="ماوس">ماوسات</option>
-                      <option value="ميكروفونات">ميكروفونات</option>
-                      <option value="مبردات">مبردات</option>
-                      <option value="كروت شاشة">كروت شاشة</option>
-                      <option value="إكسسوارات">إكسسوارات</option>
-                      <option value="الكل">أخرى / عام</option>
+                      {categories.filter(c => c !== 'الكل').map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      {!categories.includes('أخرى / عام') && (
+                        <option value="أخرى / عام">أخرى / عام</option>
+                      )}
                     </select>
                   </div>
 
@@ -1588,7 +1734,275 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 5: GOOGLE SHEETS APPS SCRIPT SYNC */}
+        {/* TAB 5: PRODUCT CATEGORIES */}
+        {activeTab === 'categories' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 shadow-xl space-y-6">
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-amber-400" />
+                    <span>إدارة أقسام وتصنيفات المنتجات (Google Sheets)</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    أضف أو احذف أقسام وتصنيفات المتجر. يتم حفظ ومزامنة جميع الأقسام تلقائياً في ورقة Google Sheets وتظهر في المتجر للمشترين.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleManualSaveCategories}
+                  disabled={isSavingCategories}
+                  className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-amber-950/40 disabled:opacity-50 flex-shrink-0 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSavingCategories ? 'animate-spin' : ''}`} />
+                  <span>{isSavingCategories ? 'جارٍ المزامنة...' : 'حفظ ومزامنة التصنيفات في الشيت'}</span>
+                </button>
+              </div>
+
+              {/* Add New Category Form */}
+              <form onSubmit={handleAddCategory} className="bg-[#151824] border border-white/10 rounded-2xl p-4 sm:p-5 space-y-3">
+                <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                  <FolderPlus className="w-4 h-4 text-amber-400" />
+                  <span>إضافة قسم / تصنيف منتجات جديد</span>
+                </h3>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="text"
+                    value={newCatInput}
+                    onChange={(e) => setNewCatInput(e.target.value)}
+                    placeholder="اكتب اسم القسم الجديد (مثال: شاشات ألعاب، كراسي قيمنق، ماوس باد...)"
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-amber-500 focus:outline-none placeholder:text-slate-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-6 py-2.5 bg-red-600 hover:bg-red-500 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md flex-shrink-0 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>إضافة القسم</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Current Categories List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-300">
+                    الأقسام الحالية المعتمدة في المتجر ({categories.length}):
+                  </h3>
+                  <span className="text-[11px] text-slate-400">
+                    (تظهر في شريط تصفية المنتجات وصفحة الشراء)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {categories.map((cat) => {
+                    const prodCount = products.filter((p) => p.category === cat).length;
+                    const isDefaultAll = cat === 'الكل';
+
+                    return (
+                      <div
+                        key={cat}
+                        className="bg-[#151824] border border-white/5 hover:border-amber-500/30 rounded-2xl p-3.5 flex items-center justify-between transition-all group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-white truncate">{cat}</h4>
+                            <span className="text-[10px] text-slate-400 block font-mono">
+                              {isDefaultAll ? 'عرض شامل' : `${prodCount} منتج`}
+                            </span>
+                          </div>
+                        </div>
+
+                        {!isDefaultAll && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCategory(cat)}
+                            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 opacity-80 group-hover:opacity-100 transition-all cursor-pointer"
+                            title={`حذف تصنيف "${cat}"`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: ADMIN SECURITY & CREDENTIALS */}
+        {activeTab === 'admin_security' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 shadow-xl space-y-6">
+              {/* Header */}
+              <div className="pb-4 border-b border-white/10">
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-emerald-400" />
+                  <span>التحكم في بيانات وتسجيل دخول الأدمن (Google Sheets)</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  يمكنك تعديل اسم المستخدم وكلمة المرور الخاصة بلوحة التحكم وحفظها مباشرة في جدول Google Sheets لتسجيل الدخول بها بأمان تام.
+                </p>
+              </div>
+
+              {/* Status Badge */}
+              <div className="bg-[#151824] border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">بيانات الأدمن المسجلة حالياً</h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      اسم المستخدم النشط: <strong className="text-emerald-400 font-mono">{adminCredentials?.username || 'admin'}</strong>
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-bold">
+                  محمي ومزامن مع Google Sheets
+                </span>
+              </div>
+
+              {/* Edit Credentials Form */}
+              <form onSubmit={handleSaveAdminCredentials} className="bg-[#151824] border border-white/10 rounded-3xl p-5 sm:p-6 space-y-5">
+                <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-red-500" />
+                  <span>تعديل اسم المستخدم وكلمة المرور الجديدة</span>
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Current Admin Username */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      اسم المستخدم الحالي للتأكيد
+                    </label>
+                    <input
+                      type="text"
+                      value={currentAdminUser}
+                      onChange={(e) => setCurrentAdminUser(e.target.value)}
+                      placeholder="admin"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Current Admin Password */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-300">
+                        كلمة المرور الحالية للتأكيد *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPass(!showCurrentPass)}
+                        className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      >
+                        {showCurrentPass ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        <span>{showCurrentPass ? 'إخفاء' : 'إظهار'}</span>
+                      </button>
+                    </div>
+                    <input
+                      type={showCurrentPass ? 'text' : 'password'}
+                      required
+                      value={currentAdminPass}
+                      onChange={(e) => setCurrentAdminPass(e.target.value)}
+                      placeholder="أدخل كلمة المرور الحالية"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  {/* New Admin Username */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      اسم المستخدم الجديد (New Username) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newAdminUser}
+                      onChange={(e) => setNewAdminUser(e.target.value)}
+                      placeholder="اسم المستخدم الجديد"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* New Admin Password */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-300">
+                        كلمة المرور الجديدة (New Password) *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+                      >
+                        {showNewPass ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        <span>{showNewPass ? 'إخفاء' : 'إظهار'}</span>
+                      </button>
+                    </div>
+                    <input
+                      type={showNewPass ? 'text' : 'password'}
+                      required
+                      value={newAdminPass}
+                      onChange={(e) => setNewAdminPass(e.target.value)}
+                      placeholder="كلمة مرور جديدة قوية"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  {/* Confirm New Password */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                      تأكيد كلمة المرور الجديدة *
+                    </label>
+                    <input
+                      type={showNewPass ? 'text' : 'password'}
+                      required
+                      value={confirmAdminPass}
+                      onChange={(e) => setConfirmAdminPass(e.target.value)}
+                      placeholder="أعد كتابة كلمة المرور الجديدة للتأكيد"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-emerald-500 focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Form Buttons with OK Button explicitly */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                    <span>يتم حفظ البيانات مباشرة في ورقة "إعدادات المتجر" بـ Google Sheets لتبقى دائمة.</span>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingCredentials}
+                    className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-950/60 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingCredentials ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>جارٍ الحفظ في Google Sheets...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>OK - تأكيد وحفظ في Google Sheets</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: GOOGLE SHEETS APPS SCRIPT SYNC */}
         {activeTab === 'sheets_sync' && (
           <div className="space-y-6">
             <div className="bg-[#12141e] border border-white/10 rounded-3xl p-6 shadow-xl space-y-6">
@@ -1793,15 +2207,12 @@ export const AdminDashboard: React.FC = () => {
                       onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value as Category })}
                       className="w-full px-4 py-2.5 rounded-xl bg-[#0e1017] border border-white/10 text-white text-xs focus:border-red-500 focus:outline-none"
                     >
-                      <option value="كاميرات مراقبة">كاميرات مراقبة</option>
-                      <option value="سماعات">سماعات</option>
-                      <option value="كيبورد">كيبوردات</option>
-                      <option value="ماوس">ماوسات</option>
-                      <option value="ميكروفونات">ميكروفونات</option>
-                      <option value="مبردات">مبردات</option>
-                      <option value="كروت شاشة">كروت شاشة</option>
-                      <option value="إكسسوارات">إكسسوارات</option>
-                      <option value="الكل">أخرى / عام</option>
+                      {categories.filter(c => c !== 'الكل').map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      {!categories.includes('أخرى / عام') && (
+                        <option value="أخرى / عام">أخرى / عام</option>
+                      )}
                     </select>
                   </div>
 

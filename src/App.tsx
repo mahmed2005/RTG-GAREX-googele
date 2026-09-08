@@ -21,6 +21,7 @@ import { PubgUcModal } from './components/PubgUcModal';
 import { PubgAccountModal } from './components/PubgAccountModal';
 import { SellAccountModal } from './components/SellAccountModal';
 import { VideoPreviewModal } from './components/VideoPreviewModal';
+import { LoadingNotification } from './components/LoadingNotification';
 import { Footer } from './components/Footer';
 
 const AppContent: React.FC = () => {
@@ -70,6 +71,9 @@ const AppContent: React.FC = () => {
 
       {/* Navbar */}
       <Navbar />
+
+      {/* Real-time Data Loading / Loaded Notification */}
+      <LoadingNotification />
 
       {/* Main Content Pages with Smooth Motion Transition */}
       <main className="flex-1">

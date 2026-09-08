@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Lock, User, KeyRound, ShieldAlert, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { Logo } from './Logo';
+import { Lock, User, KeyRound, ShieldAlert, ArrowRight } from 'lucide-react';
+import { useStore } from '../context/StoreContext';
 
 interface AdminLoginProps {
   onLoginSuccess: () => void;
@@ -8,14 +8,15 @@ interface AdminLoginProps {
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onCancel }) => {
+  const { adminCredentials } = useStore();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Default credentials (can also be changed from inside dashboard)
-  const ADMIN_USER = 'admin';
-  const ADMIN_PASS = 'rtg2026';
+  // Default credentials fallback
+  const ADMIN_USER = adminCredentials?.username || 'admin';
+  const ADMIN_PASS = adminCredentials?.password || 'rtg2026';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

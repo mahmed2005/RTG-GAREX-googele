@@ -5,20 +5,12 @@ import { Category } from '../types';
 import { Search, SlidersHorizontal, PackageX } from 'lucide-react';
 
 export const ProductsPage: React.FC = () => {
-  const { products, selectedCategory, setSelectedCategory } = useStore();
+  const { products, selectedCategory, setSelectedCategory, categories, isDataLoading } = useStore();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const categories: Category[] = [
-    'الكل',
-    'كاميرات مراقبة',
-    'سماعات',
-    'مبردات',
-    'كروت شاشة',
-    'ميكروفونات',
-    'كيبورد',
-    'ماوس',
-    'إكسسوارات',
-  ];
+  const displayCategories = categories && categories.length > 0
+    ? (categories.includes('الكل') ? categories : ['الكل', ...categories])
+    : ['الكل', 'كاميرات مراقبة', 'سماعات', 'مبردات', 'كروت شاشة', 'ميكروفونات', 'كيبورد', 'ماوس', 'إكسسوارات'];
 
   const filteredProducts = products.filter((p) => {
     const matchesCategory =
@@ -44,9 +36,9 @@ export const ProductsPage: React.FC = () => {
 
         {/* Category Pills & Search */}
         <div className="mb-10 space-y-5">
-          {/* Category Filter Pills matching video */}
+          {/* Category Filter Pills matching dynamic categories */}
           <div className="flex items-center justify-center flex-wrap gap-2.5">
-            {categories.map((cat) => {
+            {displayCategories.map((cat) => {
               const isSelected = selectedCategory === cat;
               return (
                 <button

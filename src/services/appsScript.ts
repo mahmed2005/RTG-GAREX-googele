@@ -664,6 +664,101 @@ function doPost(e) {
       }
     }
 
+    // 13. حفظ وتعديل بيانات تسجيل دخول الأدمن في Google Sheets
+    if (action === 'save_admin_credentials' || action === 'update_admin_credentials') {
+      var admUser = String(payload.username || (payload.data && payload.data.username) || '').trim();
+      var admPass = String(payload.password || (payload.data && payload.data.password) || '').trim();
+
+      if (!admUser || !admPass) {
+        return createJsonResponse({ status: 'error', message: 'اسم المستخدم وكلمة المرور مطلوبان' });
+      }
+
+      var setSheetA = findSheet(ss, ['Store Setting', 'Store Settings', 'إعدادات المتجر', 'اعدادات المتجر', 'Settings']) || ss.getSheetByName('إعدادات المتجر');
+      if (!setSheetA) {
+        setSheetA = ss.insertSheet('إعدادات المتجر');
+        setSheetA.appendRow(['اسم الإعداد', 'القيمة']);
+      }
+
+      var sData = setSheetA.getDataRange().getValues();
+      var userRow = -1;
+      var passRow = -1;
+
+      for (var si = 1; si < sData.length; si++) {
+        var k = String(sData[si][0] || '').trim();
+        if (k === 'adminUsername') userRow = si + 1;
+        if (k === 'adminPassword') passRow = si + 1;
+      }
+
+      if (userRow > 0) {
+        setSheetA.getRange(userRow, 2).setValue(admUser);
+      } else {
+        setSheetA.appendRow(['adminUsername', admUser]);
+      }
+
+      if (passRow > 0) {
+        setSheetA.getRange(passRow, 2).setValue(admPass);
+      } else {
+        setSheetA.appendRow(['adminPassword', admPass]);
+      }
+
+      return createJsonResponse({ 
+        status: 'success', 
+        message: 'تم حفظ وتحديث بيانات دخول الأدمن في Google Sheets بنجاح!',
+        username: admUser
+      });
+    }
+
+    // 14. حفظ وتعديل تصنيفات وأقسام المنتجات في Google Sheets
+    if (action === 'save_categories' || action === 'sync_categories') {
+      var catList = payload.categories || payload.data || [];
+      if (typeof catList === 'string') {
+        try { catList = JSON.parse(catList); } catch(e) { catList = catList.split(',').map(function(s){return s.trim();}); }
+      }
+
+      var catSheet = findSheet(ss, ['تصنيفات المنتجات', 'التصنيفات', 'أقسام المنتجات', 'Categories', 'تصنيفات']) || ss.getSheetByName('تصنيفات المنتجات');
+      if (!catSheet) {
+        catSheet = ss.insertSheet('تصنيفات المنتجات');
+      }
+
+      catSheet.clearContents();
+      var catHeader = ['المعرف (ID)', 'اسم التصنيف / القسم'];
+      var catRowsToInsert = [];
+
+      for (var ci = 0; ci < catList.length; ci++) {
+        var cName = String(catList[ci] || '').trim();
+        if (cName) {
+          catRowsToInsert.push(['cat-' + (ci + 1), cName]);
+        }
+      }
+
+      if (catRowsToInsert.length > 0) {
+        catSheet.getRange(1, 1, catRowsToInsert.length + 1, catHeader.length).setValues([catHeader].concat(catRowsToInsert));
+        catSheet.getRange(1, 1, 1, catHeader.length).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
+      }
+
+      // وأيضاً حفظها في ورقة إعدادات المتجر كنسخة احتياطية
+      var setSheetC = findSheet(ss, ['Store Setting', 'Store Settings', 'إعدادات المتجر', 'اعدادات المتجر', 'Settings']);
+      if (setSheetC) {
+        var scData = setSheetC.getDataRange().getValues();
+        var cRow = -1;
+        for (var sci = 1; sci < scData.length; sci++) {
+          if (String(scData[sci][0] || '').trim() === 'categories') {
+            cRow = sci + 1;
+            break;
+          }
+        }
+        var cJson = JSON.stringify(catList);
+        if (cRow > 0) setSheetC.getRange(cRow, 2).setValue(cJson);
+        else setSheetC.appendRow(['categories', cJson]);
+      }
+
+      return createJsonResponse({ 
+        status: 'success', 
+        message: 'تم حفظ وتحديث تصنيفات المنتجات في Google Sheets بنجاح!',
+        categories: catList
+      });
+    }
+
     return createJsonResponse({ status: 'error', message: 'Unknown action' });
   } catch (err) {
     return createJsonResponse({ status: 'error', message: err.toString() });
@@ -1105,13 +1200,49 @@ function getAllStoreData(ss) {
     }
   }
 
+  // 6. تصنيفات المنتجات (Categories)
+  var defaultCategories = ['الكل', 'كاميرات مراقبة', 'سماعات', 'مبردات', 'كروت شاشة', 'ميكروفونات', 'كيبورد', 'ماوس', 'إكسسوارات'];
+  var categories = defaultCategories.slice();
+  var catSheetRead = findSheet(ss, ['تصنيفات المنتجات', 'التصنيفات', 'أقسام المنتجات', 'Categories', 'تصنيفات']);
+  if (catSheetRead) {
+    var cRowsRead = catSheetRead.getDataRange().getValues();
+    if (cRowsRead.length > 1) {
+      var sheetCats = [];
+      for (var cri = 1; cri < cRowsRead.length; cri++) {
+        var cn = String(cRowsRead[cri][1] || cRowsRead[cri][0] || '').trim();
+        if (cn && sheetCats.indexOf(cn) === -1) {
+          sheetCats.push(cn);
+        }
+      }
+      if (sheetCats.length > 0) {
+        if (sheetCats.indexOf('الكل') === -1) sheetCats.unshift('الكل');
+        categories = sheetCats;
+      }
+    }
+  } else if (settings.categories) {
+    try {
+      var parsedCats = JSON.parse(settings.categories);
+      if (Array.isArray(parsedCats) && parsedCats.length > 0) {
+        categories = parsedCats;
+      }
+    } catch(e) {}
+  }
+
+  // 7. بيانات دخول الأدمن (Admin Credentials)
+  var adminUsername = 'admin';
+  var adminPassword = 'rtg2026';
+  if (settings.adminUsername) adminUsername = String(settings.adminUsername).trim();
+  if (settings.adminPassword) adminPassword = String(settings.adminPassword).trim();
+
   return {
     products: products,
     pubgAccounts: pubgAccounts,
     allPubgAccounts: allPubgAccounts,
     ucPackages: ucPackages,
     settings: settings,
-    deliveryRates: deliveryRates
+    deliveryRates: deliveryRates,
+    categories: categories,
+    adminCredentials: { username: adminUsername, password: adminPassword }
   };
 }
 
@@ -1241,7 +1372,25 @@ function setupSheetsIfMissing(ss) {
         ['facebookHandle', 'RTG Gear X'],
         ['instagramUrl', 'https://www.instagram.com/rtg_gear_x'],
         ['instagramHandle', '@rtg_gear_x'],
-        ['aboutText', 'متجرك الأول في ليبيا لمعدات الألعاب وشحن الشدات وشراء حسابات ببجي الموثقة.']
+        ['aboutText', 'متجرك الأول في ليبيا لمعدات الألعاب وشحن الشدات وشراء حسابات ببجي الموثقة.'],
+        ['adminUsername', 'admin'],
+        ['adminPassword', 'rtg2026']
+      ]
+    },
+    {
+      name: 'تصنيفات المنتجات',
+      aliases: ['تصنيفات المنتجات', 'التصنيفات', 'أقسام المنتجات', 'Categories', 'تصنيفات'],
+      headers: ['المعرف (ID)', 'اسم التصنيف / القسم'],
+      defaultRows: [
+        ['cat-1', 'الكل'],
+        ['cat-2', 'كاميرات مراقبة'],
+        ['cat-3', 'سماعات'],
+        ['cat-4', 'مبردات'],
+        ['cat-5', 'كروت شاشة'],
+        ['cat-6', 'ميكروفونات'],
+        ['cat-7', 'كيبورد'],
+        ['cat-8', 'ماوس'],
+        ['cat-9', 'إكسسوارات']
       ]
     },
     {
@@ -1431,6 +1580,8 @@ export class AppsScriptService {
     ucPackages: UcPackage[];
     settings?: Partial<StoreSettings>;
     deliveryRates?: DeliveryCityRate[];
+    categories?: string[];
+    adminCredentials?: { username: string; password?: string; passwordHash?: string; salt?: string };
   }> {
     const inputUrl = (webAppUrl && webAppUrl.trim()) ? webAppUrl.trim() : DEFAULT_APPS_SCRIPT_URL;
     
@@ -1469,6 +1620,8 @@ export class AppsScriptService {
               ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
               settings: data.settings || {},
               deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
+              categories: Array.isArray(data.categories) ? data.categories : undefined,
+              adminCredentials: data.adminCredentials || (data.settings && data.settings.adminUsername ? { username: data.settings.adminUsername, password: data.settings.adminPassword } : undefined),
             };
           }
         }
@@ -1502,6 +1655,8 @@ export class AppsScriptService {
               ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
               settings: data.settings || {},
               deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
+              categories: Array.isArray(data.categories) ? data.categories : undefined,
+              adminCredentials: data.adminCredentials || (data.settings && data.settings.adminUsername ? { username: data.settings.adminUsername, password: data.settings.adminPassword } : undefined),
             };
           }
         }
@@ -1528,6 +1683,8 @@ export class AppsScriptService {
             ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
             settings: data.settings || {},
             deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
+            categories: Array.isArray(data.categories) ? data.categories : undefined,
+            adminCredentials: data.adminCredentials || (data.settings && data.settings.adminUsername ? { username: data.settings.adminUsername, password: data.settings.adminPassword } : undefined),
           };
         }
       } catch (jsonpErr: any) {
@@ -1842,6 +1999,40 @@ export class AppsScriptService {
     await this.sendPost(webAppUrl, {
       action: 'save_delivery_rates',
       rates,
+    });
+    return true;
+  }
+
+  /**
+   * Save Admin Credentials in Google Sheets
+   */
+  public static async saveAdminCredentials(
+    webAppUrl: string,
+    username: string,
+    password: string
+  ): Promise<boolean> {
+    if (!webAppUrl || !webAppUrl.trim()) return false;
+
+    await this.sendPost(webAppUrl, {
+      action: 'save_admin_credentials',
+      username,
+      password,
+    });
+    return true;
+  }
+
+  /**
+   * Save Product Categories in Google Sheets
+   */
+  public static async saveCategories(
+    webAppUrl: string,
+    categories: string[]
+  ): Promise<boolean> {
+    if (!webAppUrl || !webAppUrl.trim()) return false;
+
+    await this.sendPost(webAppUrl, {
+      action: 'save_categories',
+      categories,
     });
     return true;
   }

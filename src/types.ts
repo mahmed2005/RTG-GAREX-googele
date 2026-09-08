@@ -1,14 +1,4 @@
-export type Category = 
-  | 'الكل'
-  | 'كاميرات مراقبة'
-  | 'سماعات'
-  | 'مبردات'
-  | 'كروت شاشة'
-  | 'ميكروفونات'
-  | 'كيبورد'
-  | 'ماوس'
-  | 'إكسسوارات'
-  | 'أخرى';
+export type Category = string;
 
 export interface Product {
   id: string;
@@ -197,4 +187,7 @@ export interface StoreSettings {
   hoursText: string;
   currency: string;
   logoUrl?: string;
+  adminUsername?: string;
+  adminPassword?: string;
+  categories?: string[];
 }

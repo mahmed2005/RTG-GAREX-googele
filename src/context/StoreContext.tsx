@@ -122,9 +122,36 @@ interface StoreContextType {
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   deleteOrder: (orderId: string) => void;
   resetToDefaults: () => void;
+
+  // Data Loading Notification
+  isDataLoading: boolean;
+  dataLoadedMessage: string | null;
+  dismissDataLoadedMessage: () => void;
+
+  // Dynamic Categories Management
+  categories: string[];
+  addCategory: (name: string) => Promise<boolean>;
+  deleteCategory: (name: string) => Promise<boolean>;
+  saveCategoriesToSheets: (cats: string[]) => Promise<boolean>;
+
+  // Admin Credentials Management (Username & Password)
+  adminCredentials: { username: string; password: string };
+  updateAdminCredentials: (oldUser: string, oldPass: string, newUser: string, newPass: string) => Promise<{ success: boolean; message: string }>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
+
+export const DEFAULT_CATEGORIES: string[] = [
+  'الكل',
+  'كاميرات مراقبة',
+  'سماعات',
+  'مبردات',
+  'كروت شاشة',
+  'ميكروفونات',
+  'كيبورد',
+  'ماوس',
+  'إكسسوارات',
+];
 
 const STORAGE_KEYS = {
   PRODUCTS: 'rtg_products_v4_unified',
@@ -135,6 +162,8 @@ const STORAGE_KEYS = {
   ORDERS: 'rtg_orders_v4_unified',
   CART: 'rtg_cart_v4_unified',
   PUBG_SUBMISSIONS: 'rtg_pubg_submissions_v4_unified',
+  CATEGORIES: 'rtg_categories_v4_unified',
+  ADMIN_CREDENTIALS: 'rtg_admin_credentials_v4',
 };
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -200,6 +229,139 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
 
   const [isAppsScriptSyncing, setIsAppsScriptSyncing] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
+  const [dataLoadedMessage, setDataLoadedMessage] = useState<string | null>(null);
+  const [hasShownLoadedToast, setHasShownLoadedToast] = useState(false);
+
+  const [categories, setCategories] = useState<string[]>(() =>
+    safeStorage.getItem<string[]>(STORAGE_KEYS.CATEGORIES, DEFAULT_CATEGORIES)
+  );
+
+  const [adminCredentials, setAdminCredentials] = useState<{ username: string; password: string }>(() => {
+    const saved = safeStorage.getItem<{ username: string; password: string }>(STORAGE_KEYS.ADMIN_CREDENTIALS, {
+      username: localStorage.getItem('rtg_admin_user') || 'admin',
+      password: localStorage.getItem('rtg_admin_pass') || 'rtg2026',
+    });
+    return saved;
+  });
+
+  // Trigger notification when data is loaded for the first time
+  useEffect(() => {
+    if (!isDataLoading && !hasShownLoadedToast) {
+      setHasShownLoadedToast(true);
+      setDataLoadedMessage('تم تحميل وتحديث المنتجات وحسابات ببجي وأسعار الشدات بنجاح! جميع المنتجات متوفرة الآن في الموقع.');
+      const timer = setTimeout(() => {
+        setDataLoadedMessage(null);
+      }, 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [isDataLoading, hasShownLoadedToast]);
+
+  const dismissDataLoadedMessage = () => {
+    setDataLoadedMessage(null);
+  };
+
+  const addCategory = async (name: string): Promise<boolean> => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    if (categories.includes(trimmed)) return false;
+
+    const newCats = [...categories, trimmed];
+    setCategories(newCats);
+    safeStorage.setItem(STORAGE_KEYS.CATEGORIES, newCats);
+
+    const cfg = AppsScriptService.getConfig();
+    if (cfg.webAppUrl) {
+      try {
+        await AppsScriptService.saveCategories(cfg.webAppUrl, newCats);
+      } catch (e) {
+        console.warn('Failed saving categories to Sheets:', e);
+      }
+    }
+    return true;
+  };
+
+  const deleteCategory = async (name: string): Promise<boolean> => {
+    if (name === 'الكل') return false;
+    const newCats = categories.filter((c) => c !== name);
+    setCategories(newCats);
+    safeStorage.setItem(STORAGE_KEYS.CATEGORIES, newCats);
+    if (selectedCategory === name) {
+      setSelectedCategory('الكل');
+    }
+
+    const cfg = AppsScriptService.getConfig();
+    if (cfg.webAppUrl) {
+      try {
+        await AppsScriptService.saveCategories(cfg.webAppUrl, newCats);
+      } catch (e) {
+        console.warn('Failed saving categories to Sheets:', e);
+      }
+    }
+    return true;
+  };
+
+  const saveCategoriesToSheets = async (cats: string[]): Promise<boolean> => {
+    const cfg = AppsScriptService.getConfig();
+    if (!cfg.webAppUrl) return false;
+    try {
+      await AppsScriptService.saveCategories(cfg.webAppUrl, cats);
+      setCategories(cats);
+      safeStorage.setItem(STORAGE_KEYS.CATEGORIES, cats);
+      return true;
+    } catch (e) {
+      console.warn('Error saving categories to Sheets:', e);
+      return false;
+    }
+  };
+
+  const updateAdminCredentials = async (
+    oldUser: string,
+    oldPass: string,
+    newUser: string,
+    newPass: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const currentStoredUser = localStorage.getItem('rtg_admin_user') || adminCredentials.username || 'admin';
+    const currentStoredPass = localStorage.getItem('rtg_admin_pass') || adminCredentials.password || 'rtg2026';
+
+    if (oldUser.trim() !== currentStoredUser || oldPass !== currentStoredPass) {
+      return { success: false, message: 'اسم المستخدم القديم أو كلمة المرور القديمة غير صحيحة!' };
+    }
+
+    if (!newUser.trim() || !newPass.trim()) {
+      return { success: false, message: 'يرجى إدخال اسم المستخدم الجديد وكلمة المرور الجديدة' };
+    }
+
+    const updatedCreds = {
+      username: newUser.trim(),
+      password: newPass.trim(),
+    };
+
+    setAdminCredentials(updatedCreds);
+    safeStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, updatedCreds);
+    localStorage.setItem('rtg_admin_user', updatedCreds.username);
+    localStorage.setItem('rtg_admin_pass', updatedCreds.password);
+
+    setSettings((prev) => ({
+      ...prev,
+      adminUsername: updatedCreds.username,
+      adminPassword: updatedCreds.password,
+    }));
+
+    const cfg = AppsScriptService.getConfig();
+    if (cfg.webAppUrl) {
+      try {
+        await AppsScriptService.saveAdminCredentials(cfg.webAppUrl, updatedCreds.username, updatedCreds.password);
+      } catch (err) {
+        console.warn('Could not sync admin credentials to Google Sheets immediately:', err);
+      }
+    }
+
+    return { 
+      success: true, 
+      message: 'تم حفظ وتحديث بيانات دخول الأدمن بنجاح في Google Sheets والمتجر!' 
+    };
+  };
 
   // Fetch live store data from backend API (/api/store) and optionally Google Apps Script
   const fetchServerData = async () => {
@@ -287,6 +449,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.deliveryRates && Array.isArray(data.deliveryRates)) {
         setDeliveryRates(data.deliveryRates);
       }
+      if (data.categories && Array.isArray(data.categories) && data.categories.length > 0) {
+        setCategories(data.categories);
+        safeStorage.setItem(STORAGE_KEYS.CATEGORIES, data.categories);
+      }
+      if (data.adminCredentials && data.adminCredentials.username && data.adminCredentials.password) {
+        const creds = { username: data.adminCredentials.username, password: data.adminCredentials.password };
+        setAdminCredentials(creds);
+        safeStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, creds);
+        localStorage.setItem('rtg_admin_user', creds.username);
+        localStorage.setItem('rtg_admin_pass', creds.password);
+      }
       if (data.settings && typeof data.settings === 'object') {
         setSettings((prev) => ({ ...prev, ...data.settings }));
       }
@@ -312,6 +485,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn('Could not auto-fetch from Google Apps Script:', e);
     } finally {
       setIsAppsScriptSyncing(false);
+      setIsDataLoading(false);
     }
   };
 
@@ -1265,6 +1439,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateOrderStatus,
         deleteOrder,
         resetToDefaults,
+        isDataLoading,
+        dataLoadedMessage,
+        dismissDataLoadedMessage,
+        categories,
+        addCategory,
+        deleteCategory,
+        saveCategoriesToSheets,
+        adminCredentials,
+        updateAdminCredentials,
       }}
     >
       {children}
