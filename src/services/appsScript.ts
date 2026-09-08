@@ -664,7 +664,7 @@ function doPost(e) {
       }
     }
 
-    // 13. حفظ وتعديل بيانات تسجيل دخول الأدمن في Google Sheets
+      // 13. حفظ وتعديل بيانات تسجيل دخول الأدمن في ورقة "أمان الأدمن" المخصصة
     if (action === 'save_admin_credentials' || action === 'update_admin_credentials') {
       var admUser = String(payload.username || (payload.data && payload.data.username) || '').trim();
       var admPass = String(payload.password || (payload.data && payload.data.password) || '').trim();
@@ -673,42 +673,65 @@ function doPost(e) {
         return createJsonResponse({ status: 'error', message: 'اسم المستخدم وكلمة المرور مطلوبان' });
       }
 
+      // 1. التخزين في الورقة المخصصة: "أمان الأدمن"
+      var admSheet = findSheet(ss, ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان']) || ss.getSheetByName('أمان الأدمن');
+      if (!admSheet) {
+        admSheet = ss.insertSheet('أمان الأدمن');
+        var admHead = ['المعرف (ID)', 'اسم المستخدم (Username)', 'كلمة المرور (Password)', 'آخر تحديث (Last Updated)', 'ملاحظات'];
+        admSheet.appendRow(admHead);
+        admSheet.getRange(1, 1, 1, admHead.length).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
+      }
+
+      var admRows = admSheet.getDataRange().getValues();
+      var nowTime = new Date().toLocaleString('ar-LY');
+      if (admRows.length > 1) {
+        // تحديث الصف الثاني (بيانات الأدمن الأساسية)
+        admSheet.getRange(2, 1, 1, 5).setValues([['admin-1', admUser, admPass, nowTime, 'تم الحفظ والمزامنة التلقائية من لوحة التحكم']]);
+      } else {
+        admSheet.appendRow(['admin-1', admUser, admPass, nowTime, 'بيانات دخول الأدمن الرئيسية للمتجر']);
+      }
+
+      // 2. وأيضاً حفظها في ورقة إعدادات المتجر كنسخة احتياطية
       var setSheetA = findSheet(ss, ['Store Setting', 'Store Settings', 'إعدادات المتجر', 'اعدادات المتجر', 'Settings']) || ss.getSheetByName('إعدادات المتجر');
-      if (!setSheetA) {
-        setSheetA = ss.insertSheet('إعدادات المتجر');
-        setSheetA.appendRow(['اسم الإعداد', 'القيمة']);
-      }
+      if (setSheetA) {
+        var sData = setSheetA.getDataRange().getValues();
+        var userRow = -1;
+        var passRow = -1;
+        for (var si = 1; si < sData.length; si++) {
+          var k = String(sData[si][0] || '').trim();
+          if (k === 'adminUsername') userRow = si + 1;
+          if (k === 'adminPassword') passRow = si + 1;
+        }
+        if (userRow > 0) setSheetA.getRange(userRow, 2).setValue(admUser);
+        else setSheetA.appendRow(['adminUsername', admUser]);
 
-      var sData = setSheetA.getDataRange().getValues();
-      var userRow = -1;
-      var passRow = -1;
-
-      for (var si = 1; si < sData.length; si++) {
-        var k = String(sData[si][0] || '').trim();
-        if (k === 'adminUsername') userRow = si + 1;
-        if (k === 'adminPassword') passRow = si + 1;
-      }
-
-      if (userRow > 0) {
-        setSheetA.getRange(userRow, 2).setValue(admUser);
-      } else {
-        setSheetA.appendRow(['adminUsername', admUser]);
-      }
-
-      if (passRow > 0) {
-        setSheetA.getRange(passRow, 2).setValue(admPass);
-      } else {
-        setSheetA.appendRow(['adminPassword', admPass]);
+        if (passRow > 0) setSheetA.getRange(passRow, 2).setValue(admPass);
+        else setSheetA.appendRow(['adminPassword', admPass]);
       }
 
       return createJsonResponse({ 
         status: 'success', 
-        message: 'تم حفظ وتحديث بيانات دخول الأدمن في Google Sheets بنجاح!',
+        message: 'تم حفظ وتحديث بيانات دخول الأدمن في ورقة أمان الأدمن بجدول Google Sheets بنجاح!',
         username: admUser
       });
     }
 
-    // 14. حفظ وتعديل تصنيفات وأقسام المنتجات في Google Sheets
+    // 13.5. التحقق الحي من بيانات دخول الأدمن (Direct Live Authentication)
+    if (action === 'verify_admin' || action === 'verify_admin_credentials') {
+      var checkUser = String(payload.username || (payload.data && payload.data.username) || '').trim();
+      var checkPass = String(payload.password || (payload.data && payload.data.password) || '').trim();
+
+      var allDataCheck = getAllStoreData(ss);
+      var validUser = allDataCheck.adminCredentials.username;
+      var validPass = allDataCheck.adminCredentials.password;
+
+      if (checkUser === validUser && checkPass === validPass) {
+        return createJsonResponse({ status: 'success', verified: true, message: 'بيانات الدخول صحيحة ومطابقة' });
+      }
+      return createJsonResponse({ status: 'error', verified: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
+    }
+
+    // 14. حفظ وتعديل تصنيفات وأقسام المنتجات في ورقة "تصنيفات المنتجات"
     if (action === 'save_categories' || action === 'sync_categories') {
       var catList = payload.categories || payload.data || [];
       if (typeof catList === 'string') {
@@ -721,13 +744,14 @@ function doPost(e) {
       }
 
       catSheet.clearContents();
-      var catHeader = ['المعرف (ID)', 'اسم التصنيف / القسم'];
+      var catHeader = ['المعرف (ID)', 'اسم التصنيف / القسم', 'تاريخ الإضافة'];
+      var nowCatTime = new Date().toLocaleString('ar-LY');
       var catRowsToInsert = [];
 
       for (var ci = 0; ci < catList.length; ci++) {
         var cName = String(catList[ci] || '').trim();
         if (cName) {
-          catRowsToInsert.push(['cat-' + (ci + 1), cName]);
+          catRowsToInsert.push(['cat-' + (ci + 1), cName, nowCatTime]);
         }
       }
 
@@ -754,9 +778,60 @@ function doPost(e) {
 
       return createJsonResponse({ 
         status: 'success', 
-        message: 'تم حفظ وتحديث تصنيفات المنتجات في Google Sheets بنجاح!',
+        message: 'تم حفظ وتحديث تصنيفات المنتجات في ورقة تصنيفات المنتجات بجدول Google Sheets بنجاح!',
         categories: catList
       });
+    }
+
+    // 14.2. إضافة تصنيف منفرد فورياً في ورقة تصنيفات المنتجات
+    if (action === 'add_category') {
+      var singleCatName = String(payload.name || payload.category || (payload.data && (payload.data.name || payload.data.category)) || '').trim();
+      if (!singleCatName) {
+        return createJsonResponse({ status: 'error', message: 'اسم التصنيف مطلوب' });
+      }
+
+      var catSheetAdd = findSheet(ss, ['تصنيفات المنتجات', 'التصنيفات', 'أقسام المنتجات', 'Categories', 'تصنيفات']) || ss.getSheetByName('تصنيفات المنتجات');
+      if (!catSheetAdd) {
+        catSheetAdd = ss.insertSheet('تصنيفات المنتجات');
+        catSheetAdd.appendRow(['المعرف (ID)', 'اسم التصنيف / القسم', 'تاريخ الإضافة']);
+        catSheetAdd.getRange(1, 1, 1, 3).setFontWeight('bold').setBackground('#1e293b').setFontColor('#ffffff');
+      }
+
+      var existingCats = catSheetAdd.getDataRange().getValues();
+      var isDuplicate = false;
+      for (var eci = 1; eci < existingCats.length; eci++) {
+        if (String(existingCats[eci][1] || '').trim().toLowerCase() === singleCatName.toLowerCase()) {
+          isDuplicate = true;
+          break;
+        }
+      }
+
+      if (!isDuplicate) {
+        catSheetAdd.appendRow(['cat-' + new Date().getTime(), singleCatName, new Date().toLocaleString('ar-LY')]);
+      }
+
+      return createJsonResponse({ status: 'success', message: 'تمت إضافة التصنيف بنجاح في Google Sheets', category: singleCatName });
+    }
+
+    // 14.3. حذف تصنيف من ورقة تصنيفات المنتجات
+    if (action === 'delete_category') {
+      var delCatName = String(payload.name || payload.category || (payload.data && (payload.data.name || payload.data.category)) || '').trim();
+      if (!delCatName || delCatName === 'الكل') {
+        return createJsonResponse({ status: 'error', message: 'لا يمكن حذف هذا التصنيف' });
+      }
+
+      var catSheetDel = findSheet(ss, ['تصنيفات المنتجات', 'التصنيفات', 'أقسام المنتجات', 'Categories', 'تصنيفات']);
+      if (catSheetDel) {
+        var dRows = catSheetDel.getDataRange().getValues();
+        for (var dri = 1; dri < dRows.length; dri++) {
+          if (String(dRows[dri][1] || '').trim().toLowerCase() === delCatName.toLowerCase()) {
+            catSheetDel.deleteRow(dri + 1);
+            return createJsonResponse({ status: 'success', message: 'تم حذف التصنيف من Google Sheets بنجاح' });
+          }
+        }
+      }
+
+      return createJsonResponse({ status: 'success', message: 'تم تنفيذ الحذف' });
     }
 
     return createJsonResponse({ status: 'error', message: 'Unknown action' });
@@ -1228,11 +1303,27 @@ function getAllStoreData(ss) {
     } catch(e) {}
   }
 
-  // 7. بيانات دخول الأدمن (Admin Credentials)
+  // 7. بيانات دخول الأدمن (Admin Credentials) من ورقة "أمان الأدمن" المخصصة
   var adminUsername = 'admin';
   var adminPassword = 'rtg2026';
-  if (settings.adminUsername) adminUsername = String(settings.adminUsername).trim();
-  if (settings.adminPassword) adminPassword = String(settings.adminPassword).trim();
+  var admSheetRead = findSheet(ss, ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان']);
+  if (admSheetRead) {
+    var admData = admSheetRead.getDataRange().getValues();
+    if (admData.length > 1) {
+      for (var ai = 1; ai < admData.length; ai++) {
+        var u = String(admData[ai][1] || '').trim();
+        var p = String(admData[ai][2] || '').trim();
+        if (u && p) {
+          adminUsername = u;
+          adminPassword = p;
+          break;
+        }
+      }
+    }
+  } else if (settings.adminUsername) {
+    adminUsername = String(settings.adminUsername).trim();
+    if (settings.adminPassword) adminPassword = String(settings.adminPassword).trim();
+  }
 
   return {
     products: products,
@@ -1283,6 +1374,14 @@ function findSheet(ss, candidates) {
 // دالة تجهيز وإعداد الجداول إذا لم تكن موجودة
 function setupSheetsIfMissing(ss) {
   var requiredSheets = [
+    {
+      name: 'أمان الأدمن',
+      aliases: ['أمان الأدمن', 'امان الادمن', 'Admin Security', 'Admin', 'بيانات الدخول', 'الأمان'],
+      headers: ['المعرف (ID)', 'اسم المستخدم (Username)', 'كلمة المرور (Password)', 'آخر تحديث (Last Updated)', 'ملاحظات'],
+      defaultRows: [
+        ['admin-1', 'admin', 'rtg2026', new Date().toLocaleString('ar-LY'), 'بيانات دخول الأدمن الرئيسية للمتجر']
+      ]
+    },
     {
       name: 'المنتجات',
       aliases: ['المنتجات', 'منتجات', 'السلع', 'باقة شدات والمنتجات', 'Products'],
@@ -1380,17 +1479,17 @@ function setupSheetsIfMissing(ss) {
     {
       name: 'تصنيفات المنتجات',
       aliases: ['تصنيفات المنتجات', 'التصنيفات', 'أقسام المنتجات', 'Categories', 'تصنيفات'],
-      headers: ['المعرف (ID)', 'اسم التصنيف / القسم'],
+      headers: ['المعرف (ID)', 'اسم التصنيف / القسم', 'تاريخ الإضافة'],
       defaultRows: [
-        ['cat-1', 'الكل'],
-        ['cat-2', 'كاميرات مراقبة'],
-        ['cat-3', 'سماعات'],
-        ['cat-4', 'مبردات'],
-        ['cat-5', 'كروت شاشة'],
-        ['cat-6', 'ميكروفونات'],
-        ['cat-7', 'كيبورد'],
-        ['cat-8', 'ماوس'],
-        ['cat-9', 'إكسسوارات']
+        ['cat-1', 'الكل', new Date().toLocaleString('ar-LY')],
+        ['cat-2', 'كاميرات مراقبة', new Date().toLocaleString('ar-LY')],
+        ['cat-3', 'سماعات', new Date().toLocaleString('ar-LY')],
+        ['cat-4', 'مبردات', new Date().toLocaleString('ar-LY')],
+        ['cat-5', 'كروت شاشة', new Date().toLocaleString('ar-LY')],
+        ['cat-6', 'ميكروفونات', new Date().toLocaleString('ar-LY')],
+        ['cat-7', 'كيبورد', new Date().toLocaleString('ar-LY')],
+        ['cat-8', 'ماوس', new Date().toLocaleString('ar-LY')],
+        ['cat-9', 'إكسسوارات', new Date().toLocaleString('ar-LY')]
       ]
     },
     {
@@ -2004,36 +2103,143 @@ export class AppsScriptService {
   }
 
   /**
-   * Save Admin Credentials in Google Sheets
+   * Save Admin Credentials in Google Sheets (Dedicated "أمان الأدمن" sheet) & Backend Server
    */
   public static async saveAdminCredentials(
     webAppUrl: string,
     username: string,
     password: string
   ): Promise<boolean> {
-    if (!webAppUrl || !webAppUrl.trim()) return false;
+    // 1. Update local backend server
+    try {
+      await fetch('/api/admin/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+    } catch (e) {
+      console.warn('Could not update backend server credentials:', e);
+    }
 
-    await this.sendPost(webAppUrl, {
-      action: 'save_admin_credentials',
-      username,
-      password,
-    });
+    // 2. Update Google Sheets dedicated "أمان الأدمن" sheet
+    if (!webAppUrl || !webAppUrl.trim()) return true;
+
+    try {
+      await this.sendPost(webAppUrl, {
+        action: 'save_admin_credentials',
+        username,
+        password,
+      });
+    } catch (err) {
+      console.warn('Apps Script save_admin_credentials error:', err);
+    }
     return true;
   }
 
   /**
-   * Save Product Categories in Google Sheets
+   * Verify Admin Credentials dynamically (online check against Google Sheets and backend server)
+   */
+  public static async verifyAdminOnline(
+    webAppUrl: string,
+    username: string,
+    password: string
+  ): Promise<boolean> {
+    const cleanUser = String(username || '').trim();
+    const cleanPass = String(password || '').trim();
+
+    // 1. Try backend server verification first
+    try {
+      const serverRes = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass }),
+      });
+      if (serverRes.ok) {
+        const data = await serverRes.json();
+        if (data.verified) return true;
+      }
+    } catch {}
+
+    // 2. Direct verification with Google Apps Script
+    if (webAppUrl && webAppUrl.trim()) {
+      try {
+        const res = await this.sendPost(webAppUrl, {
+          action: 'verify_admin',
+          username: cleanUser,
+          password: cleanPass,
+        });
+        if (res && (res.verified === true || res.status === 'success')) {
+          return true;
+        }
+      } catch {}
+    }
+
+    return false;
+  }
+
+  /**
+   * Save Product Categories in Google Sheets (Dedicated "تصنيفات المنتجات" sheet) & Backend Server
    */
   public static async saveCategories(
     webAppUrl: string,
     categories: string[]
   ): Promise<boolean> {
-    if (!webAppUrl || !webAppUrl.trim()) return false;
+    // 1. Update backend server
+    try {
+      await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categories }),
+      });
+    } catch (e) {
+      console.warn('Could not update backend server categories:', e);
+    }
 
-    await this.sendPost(webAppUrl, {
-      action: 'save_categories',
-      categories,
-    });
+    // 2. Update Google Sheets dedicated "تصنيفات المنتجات" sheet
+    if (!webAppUrl || !webAppUrl.trim()) return true;
+
+    try {
+      await this.sendPost(webAppUrl, {
+        action: 'save_categories',
+        categories,
+      });
+    } catch (err) {
+      console.warn('Apps Script save_categories error:', err);
+    }
     return true;
+  }
+
+  /**
+   * Add a single category to Google Sheets immediately
+   */
+  public static async addCategoryToSheets(webAppUrl: string, categoryName: string): Promise<boolean> {
+    if (!webAppUrl || !webAppUrl.trim()) return false;
+    try {
+      await this.sendPost(webAppUrl, {
+        action: 'add_category',
+        name: categoryName,
+        category: categoryName,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Delete a single category from Google Sheets immediately
+   */
+  public static async deleteCategoryFromSheets(webAppUrl: string, categoryName: string): Promise<boolean> {
+    if (!webAppUrl || !webAppUrl.trim()) return false;
+    try {
+      await this.sendPost(webAppUrl, {
+        action: 'delete_category',
+        name: categoryName,
+        category: categoryName,
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

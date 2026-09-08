@@ -270,10 +270,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCategories(newCats);
     safeStorage.setItem(STORAGE_KEYS.CATEGORIES, newCats);
 
+    // 1. Sync to local backend server
+    fetch('/api/admin/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categories: newCats }),
+    }).catch(() => {});
+
+    // 2. Sync to Google Sheets dedicated "تصنيفات المنتجات" sheet
     const cfg = AppsScriptService.getConfig();
     if (cfg.webAppUrl) {
       try {
         await AppsScriptService.saveCategories(cfg.webAppUrl, newCats);
+        await AppsScriptService.addCategoryToSheets(cfg.webAppUrl, trimmed);
       } catch (e) {
         console.warn('Failed saving categories to Sheets:', e);
       }
@@ -290,10 +299,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setSelectedCategory('الكل');
     }
 
+    // 1. Sync to local backend server
+    fetch('/api/admin/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categories: newCats }),
+    }).catch(() => {});
+
+    // 2. Sync to Google Sheets dedicated "تصنيفات المنتجات" sheet
     const cfg = AppsScriptService.getConfig();
     if (cfg.webAppUrl) {
       try {
         await AppsScriptService.saveCategories(cfg.webAppUrl, newCats);
+        await AppsScriptService.deleteCategoryFromSheets(cfg.webAppUrl, name);
       } catch (e) {
         console.warn('Failed saving categories to Sheets:', e);
       }
@@ -302,12 +320,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const saveCategoriesToSheets = async (cats: string[]): Promise<boolean> => {
+    // 1. Save to local backend server
+    fetch('/api/admin/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categories: cats }),
+    }).catch(() => {});
+
+    setCategories(cats);
+    safeStorage.setItem(STORAGE_KEYS.CATEGORIES, cats);
+
     const cfg = AppsScriptService.getConfig();
-    if (!cfg.webAppUrl) return false;
+    if (!cfg.webAppUrl) return true;
     try {
       await AppsScriptService.saveCategories(cfg.webAppUrl, cats);
-      setCategories(cats);
-      safeStorage.setItem(STORAGE_KEYS.CATEGORIES, cats);
       return true;
     } catch (e) {
       console.warn('Error saving categories to Sheets:', e);
@@ -348,6 +374,18 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       adminPassword: updatedCreds.password,
     }));
 
+    // 1. Update backend server instantly
+    try {
+      await fetch('/api/admin/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedCreds),
+      });
+    } catch (e) {
+      console.warn('Could not update backend server credentials:', e);
+    }
+
+    // 2. Update Google Sheets dedicated "أمان الأدمن" sheet
     const cfg = AppsScriptService.getConfig();
     if (cfg.webAppUrl) {
       try {
@@ -359,7 +397,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return { 
       success: true, 
-      message: 'تم حفظ وتحديث بيانات دخول الأدمن بنجاح في Google Sheets والمتجر!' 
+      message: 'تم حفظ وتحديث بيانات دخول الأدمن بنجاح في ورقة «أمان الأدمن» بـ Google Sheets والمتجر!' 
     };
   };
 
@@ -384,6 +422,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
           if (Array.isArray(data.deliveryRates)) {
             setDeliveryRates(data.deliveryRates);
+          }
+          if (Array.isArray(data.categories) && data.categories.length > 0) {
+            setCategories(data.categories);
+            safeStorage.setItem(STORAGE_KEYS.CATEGORIES, data.categories);
+          }
+          if (data.adminCredentials && data.adminCredentials.username && data.adminCredentials.password) {
+            const creds = { username: data.adminCredentials.username, password: data.adminCredentials.password };
+            setAdminCredentials(creds);
+            safeStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, creds);
+            localStorage.setItem('rtg_admin_user', creds.username);
+            localStorage.setItem('rtg_admin_pass', creds.password);
           }
           if (data.settings && typeof data.settings === 'object') {
             setSettings((prev) => ({ ...prev, ...data.settings }));
@@ -477,6 +526,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           allPubgAccounts: normalizedAllForSync,
           ucPackages: data.ucPackages || [],
           deliveryRates: data.deliveryRates || deliveryRates,
+          categories: data.categories || categories,
+          adminCredentials: data.adminCredentials || adminCredentials,
           settings: data.settings,
           pubgSubmissions: data.pubgSubmissions || [],
         }),
