@@ -151,7 +151,6 @@ export const DEFAULT_CATEGORIES: string[] = [
   'كيبورد',
   'ماوس',
   'إكسسوارات',
-  'سيارات'
 ];
 
 const STORAGE_KEYS = {
@@ -230,11 +229,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
 
   const [isAppsScriptSyncing, setIsAppsScriptSyncing] = useState(false);
-  const [isDataLoading, setIsDataLoading] = useState<boolean>(() => {
-    const cachedProducts = safeStorage.getItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
-    const cachedAccounts = safeStorage.getItem<PubgAccount[]>(STORAGE_KEYS.PUBG_ACCOUNTS, []);
-    return cachedProducts.length === 0 && cachedAccounts.length === 0;
-  });
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
   const [dataLoadedMessage, setDataLoadedMessage] = useState<string | null>(null);
   const [hasShownLoadedToast, setHasShownLoadedToast] = useState(false);
 
@@ -275,19 +270,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCategories(newCats);
     safeStorage.setItem(STORAGE_KEYS.CATEGORIES, newCats);
 
-    // 1. Sync to local backend server
-    fetch('/api/admin/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ categories: newCats }),
-    }).catch(() => {});
-
-    // 2. Sync to Google Sheets dedicated "تصنيفات المنتجات" sheet
     const cfg = AppsScriptService.getConfig();
     if (cfg.webAppUrl) {
       try {
         await AppsScriptService.saveCategories(cfg.webAppUrl, newCats);
-        await AppsScriptService.addCategoryToSheets(cfg.webAppUrl, trimmed);
       } catch (e) {
         console.warn('Failed saving categories to Sheets:', e);
       }
@@ -304,19 +290,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setSelectedCategory('الكل');
     }
 
-    // 1. Sync to local backend server
-    fetch('/api/admin/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ categories: newCats }),
-    }).catch(() => {});
-
-    // 2. Sync to Google Sheets dedicated "تصنيفات المنتجات" sheet
     const cfg = AppsScriptService.getConfig();
     if (cfg.webAppUrl) {
       try {
         await AppsScriptService.saveCategories(cfg.webAppUrl, newCats);
-        await AppsScriptService.deleteCategoryFromSheets(cfg.webAppUrl, name);
       } catch (e) {
         console.warn('Failed saving categories to Sheets:', e);
       }
@@ -325,20 +302,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const saveCategoriesToSheets = async (cats: string[]): Promise<boolean> => {
-    // 1. Save to local backend server
-    fetch('/api/admin/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ categories: cats }),
-    }).catch(() => {});
-
-    setCategories(cats);
-    safeStorage.setItem(STORAGE_KEYS.CATEGORIES, cats);
-
     const cfg = AppsScriptService.getConfig();
-    if (!cfg.webAppUrl) return true;
+    if (!cfg.webAppUrl) return false;
     try {
       await AppsScriptService.saveCategories(cfg.webAppUrl, cats);
+      setCategories(cats);
+      safeStorage.setItem(STORAGE_KEYS.CATEGORIES, cats);
       return true;
     } catch (e) {
       console.warn('Error saving categories to Sheets:', e);
@@ -352,7 +321,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     newUser: string,
     newPass: string
   ): Promise<{ success: boolean; message: string }> => {
-    if (!newUser || !newUser.trim() || !newPass || !newPass.trim()) {
+    const currentStoredUser = localStorage.getItem('rtg_admin_user') || adminCredentials.username || 'admin';
+    const currentStoredPass = localStorage.getItem('rtg_admin_pass') || adminCredentials.password || 'rtg2026';
+
+    if (oldUser.trim() !== currentStoredUser || oldPass !== currentStoredPass) {
+      return { success: false, message: 'اسم المستخدم القديم أو كلمة المرور القديمة غير صحيحة!' };
+    }
+
+    if (!newUser.trim() || !newPass.trim()) {
       return { success: false, message: 'يرجى إدخال اسم المستخدم الجديد وكلمة المرور الجديدة' };
     }
 
@@ -372,18 +348,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       adminPassword: updatedCreds.password,
     }));
 
-    // 1. Update backend server instantly
-    try {
-      await fetch('/api/admin/credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedCreds),
-      });
-    } catch (e) {
-      console.warn('Could not update backend server credentials:', e);
-    }
-
-    // 2. Update Google Sheets dedicated "أمان الأدمن" sheet
     const cfg = AppsScriptService.getConfig();
     if (cfg.webAppUrl) {
       try {
@@ -395,7 +359,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return { 
       success: true, 
-      message: 'تم حفظ وتحديث بيانات دخول الأدمن بنجاح في ورقة «أمان الأدمن» بـ Google Sheets والمتجر!' 
+      message: 'تم حفظ وتحديث بيانات دخول الأدمن بنجاح في Google Sheets والمتجر!' 
     };
   };
 
@@ -421,17 +385,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (Array.isArray(data.deliveryRates)) {
             setDeliveryRates(data.deliveryRates);
           }
-          if (Array.isArray(data.categories) && data.categories.length > 0) {
-            setCategories(data.categories);
-            safeStorage.setItem(STORAGE_KEYS.CATEGORIES, data.categories);
-          }
-          if (data.adminCredentials && data.adminCredentials.username && data.adminCredentials.password) {
-            const creds = { username: data.adminCredentials.username, password: data.adminCredentials.password };
-            setAdminCredentials(creds);
-            safeStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, creds);
-            localStorage.setItem('rtg_admin_user', creds.username);
-            localStorage.setItem('rtg_admin_pass', creds.password);
-          }
           if (data.settings && typeof data.settings === 'object') {
             setSettings((prev) => ({ ...prev, ...data.settings }));
           }
@@ -439,24 +392,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.warn('Local API fetch error:', err);
-    } finally {
-      // Instant readiness from local Express API - eliminate delay for users
-      setIsDataLoading(false);
-      if (!hasShownLoadedToast) {
-        setHasShownLoadedToast(true);
-        setDataLoadedMessage('تم تحميل وتحديث المنتجات وحسابات ببجي وأسعار الشدات بنجاح!');
-        setTimeout(() => {
-          setDataLoadedMessage(null);
-        }, 5000);
-      }
     }
   };
 
   // Fetch live store data from Google Apps Script Web App
   const refreshFromAppsScript = async () => {
-    // Always fetch unified server data first (instant response)
+    // Always fetch unified server data first
     await fetchServerData();
-    setIsDataLoading(false);
 
     const config = AppsScriptService.getConfig();
     if (!config.webAppUrl) return;
@@ -507,26 +449,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.deliveryRates && Array.isArray(data.deliveryRates)) {
         setDeliveryRates(data.deliveryRates);
       }
-      if (data.categories && Array.isArray(data.categories) && data.categories.length > 1) {
+      if (data.categories && Array.isArray(data.categories) && data.categories.length > 0) {
         setCategories(data.categories);
         safeStorage.setItem(STORAGE_KEYS.CATEGORIES, data.categories);
-      } else if (categories && categories.length > 1) {
-        // Sync default categories to Google Sheets dedicated "تصنيفات المنتجات" sheet
-        AppsScriptService.saveCategories(config.webAppUrl, categories).catch(() => {});
       }
       if (data.adminCredentials && data.adminCredentials.username && data.adminCredentials.password) {
-        const inUser = String(data.adminCredentials.username).trim();
-        const inPass = String(data.adminCredentials.password).trim();
-        // Prevent default fallback ('admin'/'rtg2026') from wiping custom saved credentials
-        if (adminCredentials.username !== 'admin' && inUser === 'admin' && inPass === 'rtg2026') {
-          AppsScriptService.saveAdminCredentials(config.webAppUrl, adminCredentials.username, adminCredentials.password).catch(() => {});
-        } else {
-          const creds = { username: inUser, password: inPass };
-          setAdminCredentials(creds);
-          safeStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, creds);
-          localStorage.setItem('rtg_admin_user', creds.username);
-          localStorage.setItem('rtg_admin_pass', creds.password);
-        }
+        const creds = { username: data.adminCredentials.username, password: data.adminCredentials.password };
+        setAdminCredentials(creds);
+        safeStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, creds);
+        localStorage.setItem('rtg_admin_user', creds.username);
+        localStorage.setItem('rtg_admin_pass', creds.password);
       }
       if (data.settings && typeof data.settings === 'object') {
         setSettings((prev) => ({ ...prev, ...data.settings }));
@@ -545,8 +477,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           allPubgAccounts: normalizedAllForSync,
           ucPackages: data.ucPackages || [],
           deliveryRates: data.deliveryRates || deliveryRates,
-          categories: data.categories || categories,
-          adminCredentials: data.adminCredentials || adminCredentials,
           settings: data.settings,
           pubgSubmissions: data.pubgSubmissions || [],
         }),

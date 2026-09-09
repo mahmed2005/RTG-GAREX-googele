@@ -34,24 +34,9 @@ interface StoreDatabase {
   deliveryRates: any[];
   settings: any;
   orders: any[];
-  categories: string[];
-  adminCredentials: { username: string; password: string };
   appsScriptUrl?: string;
   lastUpdated: string;
 }
-
-const DEFAULT_CATEGORIES = [
-  'الكل',
-  'كاميرات مراقبة',
-  'سماعات',
-  'مبردات',
-  'كروت شاشة',
-  'ميكروفونات',
-  'كيبورد',
-  'ماوس',
-  'إكسسوارات',
-  'سيارات'
-];
 
 function loadDatabase(): StoreDatabase {
   try {
@@ -68,8 +53,6 @@ function loadDatabase(): StoreDatabase {
           deliveryRates: Array.isArray(parsed.deliveryRates) ? parsed.deliveryRates : ALL_DELIVERY_RATES,
           settings: parsed.settings && typeof parsed.settings === 'object' ? { ...INITIAL_STORE_SETTINGS, ...parsed.settings } : INITIAL_STORE_SETTINGS,
           orders: Array.isArray(parsed.orders) ? parsed.orders : [],
-          categories: Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : DEFAULT_CATEGORIES,
-          adminCredentials: parsed.adminCredentials && parsed.adminCredentials.username && parsed.adminCredentials.password ? parsed.adminCredentials : { username: 'admin', password: 'rtg2026' },
           appsScriptUrl: parsed.appsScriptUrl || '',
           lastUpdated: parsed.lastUpdated || new Date().toISOString(),
         };
@@ -88,8 +71,6 @@ function loadDatabase(): StoreDatabase {
     deliveryRates: ALL_DELIVERY_RATES,
     settings: INITIAL_STORE_SETTINGS,
     orders: [],
-    categories: DEFAULT_CATEGORIES,
-    adminCredentials: { username: 'admin', password: 'rtg2026' },
     lastUpdated: new Date().toISOString(),
   };
 }
@@ -127,8 +108,6 @@ async function startServer() {
       deliveryRates: db.deliveryRates,
       settings: db.settings,
       orders: db.orders,
-      categories: db.categories,
-      adminCredentials: db.adminCredentials,
       lastUpdated: db.lastUpdated,
     });
   });
@@ -136,7 +115,7 @@ async function startServer() {
   // POST Sync Full Store Data from Client or Apps Script
   app.post('/api/store/sync', (req, res) => {
     try {
-      const { products, pubgAccounts, allPubgAccounts, ucPackages, deliveryRates, settings, pubgSubmissions, categories, adminCredentials } = req.body;
+      const { products, pubgAccounts, allPubgAccounts, ucPackages, deliveryRates, settings, pubgSubmissions } = req.body;
       if (Array.isArray(products)) {
         db.products = products;
       }
@@ -155,111 +134,11 @@ async function startServer() {
       if (Array.isArray(pubgSubmissions)) {
         db.pubgSubmissions = pubgSubmissions;
       }
-      if (Array.isArray(categories) && categories.length > 0) {
-        db.categories = categories;
-      }
-      if (adminCredentials && adminCredentials.username && adminCredentials.password) {
-        const inUser = String(adminCredentials.username).trim();
-        const inPass = String(adminCredentials.password).trim();
-        // Prevent default fallback ('admin'/'rtg2026') from wiping custom saved credentials
-        if (db.adminCredentials.username !== 'admin' && inUser === 'admin' && inPass === 'rtg2026') {
-          // Keep existing custom admin credentials
-        } else {
-          db.adminCredentials = { username: inUser, password: inPass };
-        }
-      }
       if (settings && typeof settings === 'object') {
         db.settings = { ...db.settings, ...settings };
       }
       saveDatabase(db);
       res.json({ status: 'success', message: 'تمت مزامنة بيانات المتجر بنجاح' });
-    } catch (e: any) {
-      res.status(500).json({ status: 'error', message: e.message });
-    }
-  });
-
-  // Dedicated Admin Credentials Endpoints
-  app.get('/api/admin/credentials', (req, res) => {
-    res.json({
-      status: 'success',
-      username: db.adminCredentials.username,
-      lastUpdated: db.lastUpdated,
-    });
-  });
-
-  app.post('/api/admin/credentials', (req, res) => {
-    try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ status: 'error', message: 'اسم المستخدم وكلمة المرور مطلوبان' });
-      }
-      db.adminCredentials = { username: String(username).trim(), password: String(password).trim() };
-      saveDatabase(db);
-      res.json({ status: 'success', message: 'تم تحديث بيانات دخول الأدمن في السيرفر بنجاح' });
-    } catch (e: any) {
-      res.status(500).json({ status: 'error', message: e.message });
-    }
-  });
-
-  app.post('/api/admin/verify', async (req, res) => {
-    try {
-      const { username, password, webAppUrl } = req.body;
-      const targetUser = String(username || '').trim();
-      const targetPass = String(password || '').trim();
-
-      // 1. Direct local DB match (case-insensitive username, exact password)
-      if (
-        targetUser.toLowerCase() === db.adminCredentials.username.toLowerCase() &&
-        targetPass === db.adminCredentials.password
-      ) {
-        return res.json({ status: 'success', verified: true, message: 'بيانات الدخول صحيحة ومطابقة' });
-      }
-
-      // 2. Check live Google Sheets via Apps Script if local didn't match
-      const targetScriptUrl = (webAppUrl || db.appsScriptUrl || '').trim();
-      if (targetScriptUrl) {
-        try {
-          const fetchUrl = targetScriptUrl.includes('?')
-            ? `${targetScriptUrl}&action=verify_admin&username=${encodeURIComponent(targetUser)}&password=${encodeURIComponent(targetPass)}`
-            : `${targetScriptUrl}?action=verify_admin&username=${encodeURIComponent(targetUser)}&password=${encodeURIComponent(targetPass)}`;
-          const gasRes = await fetch(fetchUrl);
-          if (gasRes.ok) {
-            const gasData: any = await gasRes.json();
-            if (gasData.verified === true || gasData.status === 'success') {
-              // Update local cached credentials
-              db.adminCredentials = { username: targetUser, password: targetPass };
-              saveDatabase(db);
-              return res.json({ status: 'success', verified: true, message: 'تم التحقق من Google Sheets بنجاح' });
-            }
-          }
-        } catch (gasErr) {
-          console.warn('Apps script admin verify check failed:', gasErr);
-        }
-      }
-
-      res.status(401).json({ status: 'error', verified: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
-    } catch (e: any) {
-      res.status(500).json({ status: 'error', message: e.message });
-    }
-  });
-
-  // Dedicated Categories Endpoints
-  app.get('/api/admin/categories', (req, res) => {
-    res.json({
-      status: 'success',
-      categories: db.categories,
-    });
-  });
-
-  app.post('/api/admin/categories', (req, res) => {
-    try {
-      const { categories } = req.body;
-      if (Array.isArray(categories)) {
-        db.categories = categories;
-        saveDatabase(db);
-        return res.json({ status: 'success', categories: db.categories });
-      }
-      res.status(400).json({ status: 'error', message: 'قائمة التصنيفات غير صحيحة' });
     } catch (e: any) {
       res.status(500).json({ status: 'error', message: e.message });
     }
@@ -455,10 +334,7 @@ async function startServer() {
         return res.status(400).json({ status: 'error', message: 'Missing URL' });
       }
 
-      let fullUrl = targetUrl;
-      if (!fullUrl.includes('action=')) {
-        fullUrl = fullUrl.includes('?') ? `${fullUrl}&action=get_all` : `${fullUrl}?action=get_all`;
-      }
+      const fullUrl = targetUrl.includes('?') ? `${targetUrl}&action=get_all` : `${targetUrl}?action=get_all`;
       const response = await fetch(fullUrl, {
         method: 'GET',
         redirect: 'follow',

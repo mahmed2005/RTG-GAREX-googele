@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Lock, User, KeyRound, ShieldAlert, ArrowRight, CheckCircle2, Cloud } from 'lucide-react';
+import { Lock, User, KeyRound, ShieldAlert, ArrowRight } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import { AppsScriptService } from '../services/appsScript';
 
 interface AdminLoginProps {
   onLoginSuccess: () => void;
@@ -14,62 +13,31 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onCancel
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [checkingCloud, setCheckingCloud] = useState(false);
 
-  // Default credentials fallback from context
+  // Default credentials fallback
   const ADMIN_USER = adminCredentials?.username || 'admin';
   const ADMIN_PASS = adminCredentials?.password || 'rtg2026';
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    const cleanUser = username.trim();
-    const cleanPass = password.trim();
+    setTimeout(() => {
+      // Check stored custom admin credentials or defaults
+      const storedUser = localStorage.getItem('rtg_admin_user') || ADMIN_USER;
+      const storedPass = localStorage.getItem('rtg_admin_pass') || ADMIN_PASS;
 
-    // 1. Immediate local check
-    const storedUser = (localStorage.getItem('rtg_admin_user') || ADMIN_USER).trim();
-    const storedPass = (localStorage.getItem('rtg_admin_pass') || ADMIN_PASS).trim();
-    const contextUser = (adminCredentials?.username || '').trim();
-    const contextPass = (adminCredentials?.password || '').trim();
-
-    const isLocalMatch =
-      (cleanUser.toLowerCase() === storedUser.toLowerCase() && cleanPass === storedPass) ||
-      (contextUser && cleanUser.toLowerCase() === contextUser.toLowerCase() && cleanPass === contextPass);
-
-    if (isLocalMatch) {
-      sessionStorage.setItem('rtg_admin_authenticated', 'true');
-      localStorage.setItem('rtg_admin_user', cleanUser);
-      localStorage.setItem('rtg_admin_pass', cleanPass);
-      setLoading(false);
-      onLoginSuccess();
-      return;
-    }
-
-    // 2. Cross-Device Live Online Check (in case credentials were changed from PC/another device)
-    setCheckingCloud(true);
-    try {
-      const cfg = AppsScriptService.getConfig();
-      const isVerified = await AppsScriptService.verifyAdminOnline(cfg.webAppUrl, cleanUser, cleanPass);
-
-      if (isVerified) {
-        // Successfully verified from Google Sheets "أمان الأدمن" / Server!
+      if (username.trim() === storedUser && password === storedPass) {
+        // Save session
         sessionStorage.setItem('rtg_admin_authenticated', 'true');
-        localStorage.setItem('rtg_admin_user', cleanUser);
-        localStorage.setItem('rtg_admin_pass', cleanPass);
         setLoading(false);
-        setCheckingCloud(false);
         onLoginSuccess();
-        return;
+      } else {
+        setLoading(false);
+        setError('اسم المستخدم أو كلمة المرور غير صحيحة!');
       }
-    } catch (err) {
-      console.warn('Online verification attempt failed:', err);
-    }
-
-    setLoading(false);
-    setCheckingCloud(false);
-    setError('اسم المستخدم أو كلمة المرور غير صحيحة! تأكد من كتابة البيانات المطابقة لورقة «أمان الأدمن» أو المحفوظة بلوحة التحكم.');
+    }, 400);
   };
 
   return (
@@ -138,10 +106,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onCancel
               className="w-full py-3.5 px-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl font-bold text-sm shadow-xl shadow-red-950/50 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
             >
               {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>{checkingCloud ? 'جارٍ التحقق من ورقة أمان الأدمن سحابياً...' : 'جارٍ تسجيل الدخول...'}</span>
-                </>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
                   <Lock className="w-4 h-4" />
