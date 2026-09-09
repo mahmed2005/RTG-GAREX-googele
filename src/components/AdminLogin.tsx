@@ -31,8 +31,14 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onCancel
     // 1. Immediate local check
     const storedUser = (localStorage.getItem('rtg_admin_user') || ADMIN_USER).trim();
     const storedPass = (localStorage.getItem('rtg_admin_pass') || ADMIN_PASS).trim();
+    const contextUser = (adminCredentials?.username || '').trim();
+    const contextPass = (adminCredentials?.password || '').trim();
 
-    if (cleanUser === storedUser && cleanPass === storedPass) {
+    const isLocalMatch =
+      (cleanUser.toLowerCase() === storedUser.toLowerCase() && cleanPass === storedPass) ||
+      (contextUser && cleanUser.toLowerCase() === contextUser.toLowerCase() && cleanPass === contextPass);
+
+    if (isLocalMatch) {
       sessionStorage.setItem('rtg_admin_authenticated', 'true');
       localStorage.setItem('rtg_admin_user', cleanUser);
       localStorage.setItem('rtg_admin_pass', cleanPass);

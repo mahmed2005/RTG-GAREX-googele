@@ -98,6 +98,14 @@ export const AdminDashboard: React.FC = () => {
   const [showNewPass, setShowNewPass] = useState(false);
   const [isSavingCredentials, setIsSavingCredentials] = useState(false);
 
+  // Sync state whenever adminCredentials updates from server or sheets
+  useEffect(() => {
+    if (adminCredentials?.username) {
+      setCurrentAdminUser(adminCredentials.username);
+      setNewAdminUser(adminCredentials.username);
+    }
+  }, [adminCredentials?.username]);
+
   // Deletion Confirmation Modal State
   const [itemToDelete, setItemToDelete] = useState<DeleteItemState | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);

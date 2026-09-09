@@ -51,6 +51,28 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
+    // التحقق الحي والمباشر من بيانات دخول الأدمن عبر GET
+    if (action === 'verify_admin' || action === 'verify_admin_credentials') {
+      var checkUser = String((e && e.parameter && (e.parameter.username || e.parameter.user)) || '').trim();
+      var checkPass = String((e && e.parameter && (e.parameter.password || e.parameter.pass)) || '').trim();
+      var allDataCheck = getAllStoreData(ss);
+      var validUser = allDataCheck.adminCredentials.username;
+      var validPass = allDataCheck.adminCredentials.password;
+      var isOk = (checkUser === validUser && checkPass === validPass);
+      var authObj = { 
+        status: isOk ? 'success' : 'error', 
+        verified: isOk, 
+        message: isOk ? 'بيانات الدخول صحيحة ومطابقة لورقة أمان الأدمن' : 'اسم المستخدم أو كلمة المرور غير صحيحة' 
+      };
+      var authJson = JSON.stringify(authObj);
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + authJson + ')')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(authJson)
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     var notFoundObj = { status: 'error', message: 'إجراء غير معروف' };
     if (callback) {
       return ContentService.createTextOutput(callback + '(' + JSON.stringify(notFoundObj) + ')')
@@ -708,33 +730,27 @@ function doPost(e) {
         admSheet.appendRow(newRow);
       }
 
-      // 2. حفظها أيضاً في ورقتي إعدادات المتجر وإدارة المتجر كنسخة احتياطية
-      var setSheetsAdm = [
-        findSheet(ss, ['إعدادات المتجر', 'اعدادات المتجر', 'Store Setting', 'Store Settings', 'Settings']),
-        findSheet(ss, ['إدارة المتجر', 'ادارة المتجر', 'Store Management', 'Management'])
-      ];
-      for (var sIdx = 0; sIdx < setSheetsAdm.length; sIdx++) {
-        var sSheetItem = setSheetsAdm[sIdx];
-        if (sSheetItem) {
-          var sData = sSheetItem.getDataRange().getValues();
-          var userRow = -1;
-          var passRow = -1;
-          for (var si = 1; si < sData.length; si++) {
-            var k = String(sData[si][0] || '').trim();
-            if (k === 'adminUsername') userRow = si + 1;
-            if (k === 'adminPassword') passRow = si + 1;
-          }
-          if (userRow > 0) sSheetItem.getRange(userRow, 2).setValue(admUser);
-          else sSheetItem.appendRow(['adminUsername', admUser]);
-
-          if (passRow > 0) sSheetItem.getRange(passRow, 2).setValue(admPass);
-          else sSheetItem.appendRow(['adminPassword', admPass]);
+      // 2. حفظها أيضاً في ورقة إعدادات المتجر كنسخة احتياطية
+      var setSheetAdm = findSheet(ss, ['إعدادات المتجر', 'اعدادات المتجر', 'Store Setting', 'Store Settings', 'Settings']);
+      if (setSheetAdm) {
+        var sData = setSheetAdm.getDataRange().getValues();
+        var userRow = -1;
+        var passRow = -1;
+        for (var si = 1; si < sData.length; si++) {
+          var k = String(sData[si][0] || '').trim();
+          if (k === 'adminUsername') userRow = si + 1;
+          if (k === 'adminPassword') passRow = si + 1;
         }
+        if (userRow > 0) setSheetAdm.getRange(userRow, 2).setValue(admUser);
+        else setSheetAdm.appendRow(['adminUsername', admUser]);
+
+        if (passRow > 0) setSheetAdm.getRange(passRow, 2).setValue(admPass);
+        else setSheetAdm.appendRow(['adminPassword', admPass]);
       }
 
       return createJsonResponse({ 
         status: 'success', 
-        message: 'تم حفظ وتحديث بيانات دخول الأدمن في ورقة أمان الأدمن بجدول Google Sheets بنجاح!',
+        message: 'تم حفظ وتحديث بيانات دخول الأدمن في ورقة «أمان الأدمن» بجدول Google Sheets بنجاح!',
         username: admUser
       });
     }
@@ -1298,9 +1314,8 @@ function getAllStoreData(ss) {
     }
   }
 
-  // 6. تصنيفات المنتجات (Categories)
-  var defaultCategories = ['الكل', 'كاميرات مراقبة', 'سماعات', 'مبردات', 'كروت شاشة', 'ميكروفونات', 'كيبورد', 'ماوس', 'إكسسوارات'];
-  var categories = defaultCategories.slice();
+  // 6. تصنيفات المنتجات (Categories) - قراءة حصرية وديناميكية من ورقة «تصنيفات المنتجات» بجدول Google Sheets
+  var categories = ['الكل'];
   var catSheetRead = findSheet(ss, ['تصنيفات المنتجات', 'التصنيفات', 'أقسام المنتجات', 'Categories', 'تصنيفات']);
   if (catSheetRead) {
     var cRowsRead = catSheetRead.getDataRange().getValues();
@@ -1397,7 +1412,7 @@ function onOpen() {
   try {
     SpreadsheetApp.getUi()
       .createMenu('⚡ متجر RTG Gear X')
-      .addItem('📁 فحص وتجهيز الأوراق الـ 10 (تصنيفات المنتجات، أمان الأدمن)', 'menuSetupSheets')
+      .addItem('📁 فحص وتجهيز الأوراق الـ 9 (تصنيفات المنتجات، أمان الأدمن)', 'menuSetupSheets')
       .addItem('🔄 فحص ومزامنة كافة بيانات المتجر', 'menuSyncAll')
       .addToUi();
   } catch(e) {}
@@ -1407,7 +1422,7 @@ function menuSetupSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   setupSheetsIfMissing(ss);
   try {
-    SpreadsheetApp.getUi().alert('✅ تم فحص وتجهيز كافة أوراق المتجر الـ 10 بنجاح!\nبما في ذلك ورقة «تصنيفات المنتجات» و«أمان الأدمن».');
+    SpreadsheetApp.getUi().alert('✅ تم فحص وتجهيز كافة أوراق المتجر الـ 9 بنجاح!\nبما في ذلك ورقة «تصنيفات المنتجات» و«أمان الأدمن».');
   } catch(e) {}
 }
 
@@ -1538,16 +1553,6 @@ function setupSheetsIfMissing(ss) {
       ]
     },
     {
-      name: 'إدارة المتجر',
-      aliases: ['إدارة المتجر', 'ادارة المتجر', 'Store Management', 'Management'],
-      headers: ['المعرف', 'الإعداد', 'القيمة', 'ملاحظات'],
-      defaultRows: [
-        ['mgt-1', 'adminUsername', 'admin', 'اسم مستخدم الأدمن'],
-        ['mgt-2', 'adminPassword', 'rtg2026', 'كلمة مرور الأدمن'],
-        ['mgt-3', 'storeName', 'RTG Gear X', 'اسم المتجر']
-      ]
-    },
-    {
       name: 'الطلبات الواردة',
       aliases: ['طلبات الواردة', 'الطلبات الواردة', 'الطلبات', 'طلبات الشراء', 'Orders'],
       headers: ['رقم الطلب', 'التاريخ والوقت', 'نوع الطلب', 'اسم العميل', 'رقم الهاتف', 'المدينة', 'المنطقة', 'طريقة الدفع', 'الإجمالي (د.ل)', 'الحالة', 'تفاصيل العناصر']
@@ -1586,7 +1591,8 @@ function setupSheetsIfMissing(ss) {
         ['cat-6', 'ميكروفونات', new Date().toLocaleString('ar-LY')],
         ['cat-7', 'كيبورد', new Date().toLocaleString('ar-LY')],
         ['cat-8', 'ماوس', new Date().toLocaleString('ar-LY')],
-        ['cat-9', 'إكسسوارات', new Date().toLocaleString('ar-LY')]
+        ['cat-9', 'إكسسوارات', new Date().toLocaleString('ar-LY')],
+        ['cat-10', 'سيارات', new Date().toLocaleString('ar-LY')]
       ]
     }
   ];
@@ -2202,25 +2208,29 @@ export class AppsScriptService {
     username: string,
     password: string
   ): Promise<boolean> {
+    const cleanUser = String(username).trim();
+    const cleanPass = String(password).trim();
+
     // 1. Update local backend server
     try {
       await fetch('/api/admin/credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: cleanUser, password: cleanPass }),
       });
     } catch (e) {
       console.warn('Could not update backend server credentials:', e);
     }
 
     // 2. Update Google Sheets dedicated "أمان الأدمن" sheet
-    if (!webAppUrl || !webAppUrl.trim()) return true;
+    const targetUrl = webAppUrl && webAppUrl.trim() ? webAppUrl.trim() : (this.getConfig().webAppUrl || '');
+    if (!targetUrl) return true;
 
     try {
-      await this.sendPost(webAppUrl, {
+      await this.sendPost(targetUrl, {
         action: 'save_admin_credentials',
-        username,
-        password,
+        username: cleanUser,
+        password: cleanPass,
       });
     } catch (err) {
       console.warn('Apps Script save_admin_credentials error:', err);
@@ -2238,24 +2248,29 @@ export class AppsScriptService {
   ): Promise<boolean> {
     const cleanUser = String(username || '').trim();
     const cleanPass = String(password || '').trim();
+    const targetUrl = (webAppUrl && webAppUrl.trim()) ? webAppUrl.trim() : (this.getConfig().webAppUrl || '');
 
-    // 1. Try backend server verification first
-    try {
-      const serverRes = await fetch('/api/admin/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: cleanUser, password: cleanPass }),
-      });
-      if (serverRes.ok) {
-        const data = await serverRes.json();
-        if (data.verified) return true;
-      }
-    } catch {}
-
-    // 2. Direct verification with Google Apps Script
-    if (webAppUrl && webAppUrl.trim()) {
+    // 1. Direct live online verification with Google Apps Script via proxy GET (fastest, 100% reliable)
+    if (targetUrl) {
       try {
-        const res = await this.sendPost(webAppUrl, {
+        const verifyQueryUrl = targetUrl.includes('?')
+          ? `${targetUrl}&action=verify_admin&username=${encodeURIComponent(cleanUser)}&password=${encodeURIComponent(cleanPass)}`
+          : `${targetUrl}?action=verify_admin&username=${encodeURIComponent(cleanUser)}&password=${encodeURIComponent(cleanPass)}`;
+
+        const proxyRes = await fetch(`/api/apps-script-proxy?url=${encodeURIComponent(verifyQueryUrl)}`);
+        if (proxyRes.ok) {
+          const data = await proxyRes.json();
+          if (data && (data.verified === true || data.status === 'success')) {
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn('Direct proxy verify failed, attempting POST fallback:', err);
+      }
+
+      // Also try POST
+      try {
+        const res = await this.sendPost(targetUrl, {
           action: 'verify_admin',
           username: cleanUser,
           password: cleanPass,
@@ -2265,6 +2280,19 @@ export class AppsScriptService {
         }
       } catch {}
     }
+
+    // 2. Try backend server verification
+    try {
+      const serverRes = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass, webAppUrl: targetUrl }),
+      });
+      if (serverRes.ok) {
+        const data = await serverRes.json();
+        if (data.verified) return true;
+      }
+    } catch {}
 
     return false;
   }

@@ -49,7 +49,8 @@ const DEFAULT_CATEGORIES = [
   'ميكروفونات',
   'كيبورد',
   'ماوس',
-  'إكسسوارات'
+  'إكسسوارات',
+  'سيارات'
 ];
 
 function loadDatabase(): StoreDatabase {
@@ -158,7 +159,14 @@ async function startServer() {
         db.categories = categories;
       }
       if (adminCredentials && adminCredentials.username && adminCredentials.password) {
-        db.adminCredentials = adminCredentials;
+        const inUser = String(adminCredentials.username).trim();
+        const inPass = String(adminCredentials.password).trim();
+        // Prevent default fallback ('admin'/'rtg2026') from wiping custom saved credentials
+        if (db.adminCredentials.username !== 'admin' && inUser === 'admin' && inPass === 'rtg2026') {
+          // Keep existing custom admin credentials
+        } else {
+          db.adminCredentials = { username: inUser, password: inPass };
+        }
       }
       if (settings && typeof settings === 'object') {
         db.settings = { ...db.settings, ...settings };
@@ -193,14 +201,42 @@ async function startServer() {
     }
   });
 
-  app.post('/api/admin/verify', (req, res) => {
+  app.post('/api/admin/verify', async (req, res) => {
     try {
-      const { username, password } = req.body;
+      const { username, password, webAppUrl } = req.body;
       const targetUser = String(username || '').trim();
       const targetPass = String(password || '').trim();
-      if (targetUser === db.adminCredentials.username && targetPass === db.adminCredentials.password) {
+
+      // 1. Direct local DB match (case-insensitive username, exact password)
+      if (
+        targetUser.toLowerCase() === db.adminCredentials.username.toLowerCase() &&
+        targetPass === db.adminCredentials.password
+      ) {
         return res.json({ status: 'success', verified: true, message: 'بيانات الدخول صحيحة ومطابقة' });
       }
+
+      // 2. Check live Google Sheets via Apps Script if local didn't match
+      const targetScriptUrl = (webAppUrl || db.appsScriptUrl || '').trim();
+      if (targetScriptUrl) {
+        try {
+          const fetchUrl = targetScriptUrl.includes('?')
+            ? `${targetScriptUrl}&action=verify_admin&username=${encodeURIComponent(targetUser)}&password=${encodeURIComponent(targetPass)}`
+            : `${targetScriptUrl}?action=verify_admin&username=${encodeURIComponent(targetUser)}&password=${encodeURIComponent(targetPass)}`;
+          const gasRes = await fetch(fetchUrl);
+          if (gasRes.ok) {
+            const gasData: any = await gasRes.json();
+            if (gasData.verified === true || gasData.status === 'success') {
+              // Update local cached credentials
+              db.adminCredentials = { username: targetUser, password: targetPass };
+              saveDatabase(db);
+              return res.json({ status: 'success', verified: true, message: 'تم التحقق من Google Sheets بنجاح' });
+            }
+          }
+        } catch (gasErr) {
+          console.warn('Apps script admin verify check failed:', gasErr);
+        }
+      }
+
       res.status(401).json({ status: 'error', verified: false, message: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
     } catch (e: any) {
       res.status(500).json({ status: 'error', message: e.message });
@@ -419,7 +455,10 @@ async function startServer() {
         return res.status(400).json({ status: 'error', message: 'Missing URL' });
       }
 
-      const fullUrl = targetUrl.includes('?') ? `${targetUrl}&action=get_all` : `${targetUrl}?action=get_all`;
+      let fullUrl = targetUrl;
+      if (!fullUrl.includes('action=')) {
+        fullUrl = fullUrl.includes('?') ? `${fullUrl}&action=get_all` : `${fullUrl}?action=get_all`;
+      }
       const response = await fetch(fullUrl, {
         method: 'GET',
         redirect: 'follow',

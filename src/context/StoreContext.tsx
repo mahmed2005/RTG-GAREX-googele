@@ -151,6 +151,7 @@ export const DEFAULT_CATEGORIES: string[] = [
   'كيبورد',
   'ماوس',
   'إكسسوارات',
+  'سيارات'
 ];
 
 const STORAGE_KEYS = {
@@ -229,7 +230,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
 
   const [isAppsScriptSyncing, setIsAppsScriptSyncing] = useState(false);
-  const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(() => {
+    const cachedProducts = safeStorage.getItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
+    const cachedAccounts = safeStorage.getItem<PubgAccount[]>(STORAGE_KEYS.PUBG_ACCOUNTS, []);
+    return cachedProducts.length === 0 && cachedAccounts.length === 0;
+  });
   const [dataLoadedMessage, setDataLoadedMessage] = useState<string | null>(null);
   const [hasShownLoadedToast, setHasShownLoadedToast] = useState(false);
 
@@ -434,13 +439,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     } catch (err) {
       console.warn('Local API fetch error:', err);
+    } finally {
+      // Instant readiness from local Express API - eliminate delay for users
+      setIsDataLoading(false);
+      if (!hasShownLoadedToast) {
+        setHasShownLoadedToast(true);
+        setDataLoadedMessage('تم تحميل وتحديث المنتجات وحسابات ببجي وأسعار الشدات بنجاح!');
+        setTimeout(() => {
+          setDataLoadedMessage(null);
+        }, 5000);
+      }
     }
   };
 
   // Fetch live store data from Google Apps Script Web App
   const refreshFromAppsScript = async () => {
-    // Always fetch unified server data first
+    // Always fetch unified server data first (instant response)
     await fetchServerData();
+    setIsDataLoading(false);
 
     const config = AppsScriptService.getConfig();
     if (!config.webAppUrl) return;
@@ -491,16 +507,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.deliveryRates && Array.isArray(data.deliveryRates)) {
         setDeliveryRates(data.deliveryRates);
       }
-      if (data.categories && Array.isArray(data.categories) && data.categories.length > 0) {
+      if (data.categories && Array.isArray(data.categories) && data.categories.length > 1) {
         setCategories(data.categories);
         safeStorage.setItem(STORAGE_KEYS.CATEGORIES, data.categories);
+      } else if (categories && categories.length > 1) {
+        // Sync default categories to Google Sheets dedicated "تصنيفات المنتجات" sheet
+        AppsScriptService.saveCategories(config.webAppUrl, categories).catch(() => {});
       }
       if (data.adminCredentials && data.adminCredentials.username && data.adminCredentials.password) {
-        const creds = { username: data.adminCredentials.username, password: data.adminCredentials.password };
-        setAdminCredentials(creds);
-        safeStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, creds);
-        localStorage.setItem('rtg_admin_user', creds.username);
-        localStorage.setItem('rtg_admin_pass', creds.password);
+        const inUser = String(data.adminCredentials.username).trim();
+        const inPass = String(data.adminCredentials.password).trim();
+        // Prevent default fallback ('admin'/'rtg2026') from wiping custom saved credentials
+        if (adminCredentials.username !== 'admin' && inUser === 'admin' && inPass === 'rtg2026') {
+          AppsScriptService.saveAdminCredentials(config.webAppUrl, adminCredentials.username, adminCredentials.password).catch(() => {});
+        } else {
+          const creds = { username: inUser, password: inPass };
+          setAdminCredentials(creds);
+          safeStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, creds);
+          localStorage.setItem('rtg_admin_user', creds.username);
+          localStorage.setItem('rtg_admin_pass', creds.password);
+        }
       }
       if (data.settings && typeof data.settings === 'object') {
         setSettings((prev) => ({ ...prev, ...data.settings }));
