@@ -172,9 +172,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [selectedCategory, setSelectedCategory] = useState<string>('الكل');
 
   // Persistence State
-  const [products, setProducts] = useState<Product[]>(() => 
-    safeStorage.getItem<Product[]>(STORAGE_KEYS.PRODUCTS, [])
-  );
+  const [products, setProducts] = useState<Product[]>(() => {
+    const saved = safeStorage.getItem<Product[]>(STORAGE_KEYS.PRODUCTS, []);
+    if (Array.isArray(saved) && saved.length > 0) return saved;
+    const meta = safeStorage.getItem<Product[]>(STORAGE_KEYS.PRODUCTS + '_meta', []);
+    if (Array.isArray(meta) && meta.length > 0) return meta;
+    return [];
+  });
 
   const [pubgAccounts, setPubgAccounts] = useState<PubgAccount[]>(() => 
     safeStorage.getItem<PubgAccount[]>(STORAGE_KEYS.PUBG_ACCOUNTS, [])
@@ -250,7 +254,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Trigger notification when data is loaded for the first time
   useEffect(() => {
-    if (!isDataLoading && !hasShownLoadedToast) {
+    if (!isDataLoading && !hasShownLoadedToast && (products.length > 0 || pubgAccounts.length > 0)) {
       setHasShownLoadedToast(true);
       setDataLoadedMessage('تم تحميل وتحديث المنتجات وحسابات ببجي وأسعار الشدات بنجاح! جميع المنتجات متوفرة الآن في الموقع.');
       const timer = setTimeout(() => {
@@ -258,7 +262,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }, 7000);
       return () => clearTimeout(timer);
     }
-  }, [isDataLoading, hasShownLoadedToast]);
+  }, [isDataLoading, hasShownLoadedToast, products.length, pubgAccounts.length]);
 
   const dismissDataLoadedMessage = () => {
     setDataLoadedMessage(null);
@@ -369,23 +373,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Fetch live store data from backend API (/api/store) with instant sub-second response
   const fetchServerData = async () => {
     try {
-      const res = await fetch('/api/store');
+      let res = await fetch('/api/store');
+      if (!res.ok) {
+        res = await fetch('/store-data-backup.json');
+      }
       if (res.ok) {
         const data = await res.json();
         if (data && data.status === 'success') {
           if (Array.isArray(data.products) && data.products.length > 0) {
             setProducts(data.products);
           }
-          if (Array.isArray(data.pubgAccounts)) {
+          if (Array.isArray(data.pubgAccounts) && data.pubgAccounts.length > 0) {
             setPubgAccounts(data.pubgAccounts);
           }
-          if (Array.isArray(data.allPubgAccounts)) {
+          if (Array.isArray(data.allPubgAccounts) && data.allPubgAccounts.length > 0) {
             setAllPubgAccounts(data.allPubgAccounts);
           }
-          if (Array.isArray(data.ucPackages)) {
+          if (Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
             setUcPackages(data.ucPackages);
           }
-          if (Array.isArray(data.deliveryRates)) {
+          if (Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
             setDeliveryRates(data.deliveryRates);
           }
           if (data.settings && typeof data.settings === 'object') {
@@ -437,24 +444,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.products && Array.isArray(data.products) && data.products.length > 0) {
         setProducts(data.products);
       }
-      if (data.pubgAccounts && Array.isArray(data.pubgAccounts)) {
+      if (data.pubgAccounts && Array.isArray(data.pubgAccounts) && data.pubgAccounts.length > 0) {
         const normAccounts = normalizeAccounts(data.pubgAccounts);
         setPubgAccounts(normAccounts);
       }
-      if (data.allPubgAccounts && Array.isArray(data.allPubgAccounts)) {
+      if (data.allPubgAccounts && Array.isArray(data.allPubgAccounts) && data.allPubgAccounts.length > 0) {
         const normAll = normalizeAccounts(data.allPubgAccounts);
         setAllPubgAccounts(normAll);
-      } else if (data.pubgAccounts && Array.isArray(data.pubgAccounts)) {
+      } else if (data.pubgAccounts && Array.isArray(data.pubgAccounts) && data.pubgAccounts.length > 0) {
         const normAccounts = normalizeAccounts(data.pubgAccounts);
         setAllPubgAccounts(normAccounts);
       }
-      if (data.pubgSubmissions && Array.isArray(data.pubgSubmissions)) {
+      if (data.pubgSubmissions && Array.isArray(data.pubgSubmissions) && data.pubgSubmissions.length > 0) {
         setPubgSubmissions(data.pubgSubmissions);
       }
-      if (data.ucPackages && Array.isArray(data.ucPackages)) {
+      if (data.ucPackages && Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
         setUcPackages(data.ucPackages);
       }
-      if (data.deliveryRates && Array.isArray(data.deliveryRates)) {
+      if (data.deliveryRates && Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
         setDeliveryRates(data.deliveryRates);
       }
       if (data.categories && Array.isArray(data.categories) && data.categories.length > 0) {
@@ -475,22 +482,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Persist to IndexedDB
       indexedDbService.saveAllStoreData(data).catch(() => {});
 
-      // Sync fetched Apps Script data to backend server cache
+      // Sync fetched Apps Script data to backend server cache ONLY if non-empty
       const normalizedAccountsForSync = data.pubgAccounts ? normalizeAccounts(data.pubgAccounts) : [];
       const normalizedAllForSync = data.allPubgAccounts ? normalizeAccounts(data.allPubgAccounts) : normalizedAccountsForSync;
+
+      const payloadToSync: any = {
+        settings: data.settings,
+      };
+      if (Array.isArray(data.products) && data.products.length > 0) {
+        payloadToSync.products = data.products;
+      }
+      if (normalizedAccountsForSync.length > 0) {
+        payloadToSync.pubgAccounts = normalizedAccountsForSync;
+      }
+      if (normalizedAllForSync.length > 0) {
+        payloadToSync.allPubgAccounts = normalizedAllForSync;
+      }
+      if (Array.isArray(data.ucPackages) && data.ucPackages.length > 0) {
+        payloadToSync.ucPackages = data.ucPackages;
+      }
+      if (Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
+        payloadToSync.deliveryRates = data.deliveryRates;
+      }
+      if (Array.isArray(data.pubgSubmissions)) {
+        payloadToSync.pubgSubmissions = data.pubgSubmissions;
+      }
 
       fetch('/api/store/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          products: data.products || [],
-          pubgAccounts: normalizedAccountsForSync,
-          allPubgAccounts: normalizedAllForSync,
-          ucPackages: data.ucPackages || [],
-          deliveryRates: data.deliveryRates || deliveryRates,
-          settings: data.settings,
-          pubgSubmissions: data.pubgSubmissions || [],
-        }),
+        body: JSON.stringify(payloadToSync),
       }).catch(() => {});
     } catch (e) {
       console.warn('Could not auto-fetch from Google Apps Script:', e);
@@ -547,7 +568,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Sync to local storage safely
   useEffect(() => {
-    safeStorage.setItem(STORAGE_KEYS.PRODUCTS, products);
+    if (products.length > 0) {
+      const isSaved = safeStorage.setItem(STORAGE_KEYS.PRODUCTS, products);
+      if (!isSaved) {
+        const lightweight = products.map(({ id, name, category, price, oldPrice, tag, description, inStock, featured, image }) => ({
+          id, name, category, price, oldPrice, tag, description, inStock, featured,
+          image: image && image.length < 50000 ? image : ''
+        }));
+        safeStorage.setItem(STORAGE_KEYS.PRODUCTS + '_meta', lightweight);
+      }
+    }
   }, [products]);
 
   useEffect(() => {

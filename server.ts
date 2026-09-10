@@ -78,6 +78,15 @@ function loadDatabase(): StoreDatabase {
 
 function saveDatabase(db: StoreDatabase) {
   try {
+    // Safety guard: Never overwrite an existing database that has products with an empty product list
+    if (fs.existsSync(DATA_FILE) && (!db.products || db.products.length === 0)) {
+      try {
+        const existing = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+        if (existing && Array.isArray(existing.products) && existing.products.length > 0) {
+          db.products = existing.products;
+        }
+      } catch {}
+    }
     db.lastUpdated = new Date().toISOString();
     fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf8');
   } catch (e) {
@@ -189,19 +198,19 @@ async function startServer() {
   app.post('/api/store/sync', (req, res) => {
     try {
       const { products, pubgAccounts, allPubgAccounts, ucPackages, deliveryRates, settings, pubgSubmissions } = req.body;
-      if (Array.isArray(products)) {
+      if (Array.isArray(products) && products.length > 0) {
         db.products = products;
       }
-      if (Array.isArray(pubgAccounts)) {
+      if (Array.isArray(pubgAccounts) && pubgAccounts.length > 0) {
         db.pubgAccounts = pubgAccounts;
       }
-      if (Array.isArray(allPubgAccounts)) {
+      if (Array.isArray(allPubgAccounts) && allPubgAccounts.length > 0) {
         db.allPubgAccounts = allPubgAccounts;
       }
-      if (Array.isArray(ucPackages)) {
+      if (Array.isArray(ucPackages) && ucPackages.length > 0) {
         db.ucPackages = ucPackages;
       }
-      if (Array.isArray(deliveryRates)) {
+      if (Array.isArray(deliveryRates) && deliveryRates.length > 0) {
         db.deliveryRates = deliveryRates;
       }
       if (Array.isArray(pubgSubmissions)) {
