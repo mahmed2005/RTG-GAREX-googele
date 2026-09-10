@@ -78,10 +78,18 @@ export class GoogleSheetsService {
         script.src = 'https://accounts.google.com/gsi/client';
         script.async = true;
         script.defer = true;
+        script.crossOrigin = 'anonymous';
         script.onload = () => {
           this.initAndRequestToken(resolve, reject);
         };
-        script.onerror = () => reject(new Error('فشل تحميل Google Identity Services SDK'));
+        script.onerror = (e) => {
+          try {
+            if (typeof e === 'object' && e && 'preventDefault' in e) {
+              (e as Event).preventDefault();
+            }
+          } catch {}
+          reject(new Error('فشل تحميل Google Identity Services SDK'));
+        };
         document.body.appendChild(script);
       } else {
         this.initAndRequestToken(resolve, reject);

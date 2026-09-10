@@ -91,14 +91,19 @@ let db = loadDatabase();
 async function syncFromGoogleAppsScript() {
   try {
     const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbyLT7CH_DtGvX63okgIsf-PqWLTgxJk9y2lwtxiv3WWhfT0PQwLB9n-647sg0d5SKSeOA/exec?action=get_all';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
     const response = await fetch(appsScriptUrl, {
       method: 'GET',
       redirect: 'follow',
+      signal: controller.signal,
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 RTG-Store-Backend/1.0',
       },
     });
+    clearTimeout(timeout);
 
     if (response.ok) {
       const text = await response.text();
@@ -402,15 +407,23 @@ async function startServer() {
         return res.status(400).json({ status: 'error', message: 'Missing URL' });
       }
 
-      const fullUrl = targetUrl.includes('?') ? `${targetUrl}&action=get_all` : `${targetUrl}?action=get_all`;
+      const fullUrl = targetUrl.includes('action=') 
+        ? targetUrl 
+        : (targetUrl.includes('?') ? `${targetUrl}&action=get_all` : `${targetUrl}?action=get_all`);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(fullUrl, {
         method: 'GET',
         redirect: 'follow',
+        signal: controller.signal,
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         },
       });
+      clearTimeout(timer);
 
       const text = await response.text();
       try {
@@ -428,8 +441,7 @@ async function startServer() {
         res.send(text);
       }
     } catch (e: any) {
-      console.error('Apps Script GET proxy error:', e);
-      res.status(500).json({ status: 'error', message: e.message });
+      res.status(500).json({ status: 'error', message: e.message || 'Proxy request error' });
     }
   });
 
@@ -441,12 +453,17 @@ async function startServer() {
         return res.status(400).json({ status: 'error', message: 'Missing URL' });
       }
 
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(url, {
         method: 'POST',
         redirect: 'follow',
+        signal: controller.signal,
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload),
       });
+      clearTimeout(timer);
 
       const text = await response.text();
       try {
@@ -456,8 +473,7 @@ async function startServer() {
         res.json({ status: 'success', raw: text });
       }
     } catch (e: any) {
-      console.error('Apps Script POST proxy error:', e);
-      res.status(500).json({ status: 'error', message: e.message });
+      res.status(500).json({ status: 'error', message: e.message || 'Proxy request error' });
     }
   });
 

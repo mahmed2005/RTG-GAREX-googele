@@ -9,7 +9,15 @@ const DB_VERSION = 1;
 const STORE_NAME = 'app_cache';
 
 function openDb(): Promise<IDBDatabase | null> {
-  if (typeof window === 'undefined' || !window.indexedDB) {
+  try {
+    if (typeof window === 'undefined') {
+      return Promise.resolve(null);
+    }
+    const idb = window.indexedDB;
+    if (!idb) {
+      return Promise.resolve(null);
+    }
+  } catch {
     return Promise.resolve(null);
   }
 
@@ -18,9 +26,13 @@ function openDb(): Promise<IDBDatabase | null> {
       const request = window.indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME);
+        try {
+          const db = (event.target as IDBOpenDBRequest).result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        } catch {
+          resolve(null);
         }
       };
 
@@ -28,7 +40,14 @@ function openDb(): Promise<IDBDatabase | null> {
         resolve(request.result);
       };
 
-      request.onerror = () => {
+      request.onerror = (e) => {
+        try {
+          e.preventDefault();
+        } catch {}
+        resolve(null);
+      };
+
+      request.onblocked = () => {
         resolve(null);
       };
     } catch {
@@ -39,44 +58,60 @@ function openDb(): Promise<IDBDatabase | null> {
 
 export const indexedDbService = {
   async get<T>(key: string): Promise<T | null> {
-    const db = await openDb();
-    if (!db) return null;
+    try {
+      const db = await openDb();
+      if (!db) return null;
 
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const req = store.get(key);
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.get(key);
 
-        req.onsuccess = () => {
-          resolve((req.result as T) ?? null);
-        };
+          req.onsuccess = () => {
+            resolve((req.result as T) ?? null);
+          };
 
-        req.onerror = () => {
+          req.onerror = (e) => {
+            try {
+              e.preventDefault();
+            } catch {}
+            resolve(null);
+          };
+        } catch {
           resolve(null);
-        };
-      } catch {
-        resolve(null);
-      }
-    });
+        }
+      });
+    } catch {
+      return null;
+    }
   },
 
   async set<T>(key: string, value: T): Promise<void> {
-    const db = await openDb();
-    if (!db) return;
+    try {
+      const db = await openDb();
+      if (!db) return;
 
-    return new Promise((resolve) => {
-      try {
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.put(value, key);
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          store.put(value, key);
 
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
-      } catch {
-        resolve();
-      }
-    });
+          tx.oncomplete = () => resolve();
+          tx.onerror = (e) => {
+            try {
+              e.preventDefault();
+            } catch {}
+            resolve();
+          };
+        } catch {
+          resolve();
+        }
+      });
+    } catch {
+      return;
+    }
   },
 
   async saveAllStoreData(data: {

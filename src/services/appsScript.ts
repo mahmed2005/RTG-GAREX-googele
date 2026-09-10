@@ -1517,62 +1517,6 @@ export class AppsScriptService {
   }
 
   /**
-   * Universal JSONP requester that completely bypasses CORS restrictions
-   */
-  private static loadViaJsonp(baseUrl: string, timeoutMs: number = 7000): Promise<any> {
-    return new Promise((resolve, reject) => {
-      if (typeof window === 'undefined') {
-        return reject(new Error('Window is undefined'));
-      }
-
-      const callbackName = 'rtg_gas_cb_' + Math.random().toString(36).substring(2, 10);
-      let isDone = false;
-
-      const timer = setTimeout(() => {
-        if (!isDone) {
-          isDone = true;
-          cleanup();
-          reject(new Error('JSONP timeout'));
-        }
-      }, timeoutMs);
-
-      const cleanup = () => {
-        clearTimeout(timer);
-        try {
-          delete (window as any)[callbackName];
-        } catch {}
-        const scriptEl = document.getElementById(callbackName);
-        if (scriptEl && scriptEl.parentNode) {
-          scriptEl.parentNode.removeChild(scriptEl);
-        }
-      };
-
-      (window as any)[callbackName] = (data: any) => {
-        if (!isDone) {
-          isDone = true;
-          cleanup();
-          resolve(data);
-        }
-      };
-
-      const script = document.createElement('script');
-      script.id = callbackName;
-      const sep = baseUrl.includes('?') ? '&' : '?';
-      script.src = `${baseUrl}${sep}action=get_all&callback=${callbackName}&_t=${Date.now()}`;
-      script.async = true;
-      script.onerror = () => {
-        if (!isDone) {
-          isDone = true;
-          cleanup();
-          reject(new Error('JSONP load error'));
-        }
-      };
-
-      document.head.appendChild(script);
-    });
-  }
-
-  /**
    * Fetch all store items live from Google Apps Script Web App
    */
   public static async fetchStoreData(webAppUrl?: string): Promise<{
@@ -1586,90 +1530,30 @@ export class AppsScriptService {
     categories?: string[];
     adminCredentials?: { username: string; password?: string; passwordHash?: string; salt?: string };
   }> {
-    const inputUrl = (webAppUrl && webAppUrl.trim()) ? webAppUrl.trim() : DEFAULT_APPS_SCRIPT_URL;
-    
-    // Prepare candidate URLs (support both /exec and /dev seamlessly)
-    const urlsToTry: string[] = [];
-    urlsToTry.push(inputUrl);
-
+    let inputUrl = (webAppUrl && webAppUrl.trim()) ? webAppUrl.trim() : DEFAULT_APPS_SCRIPT_URL;
     if (inputUrl.endsWith('/dev')) {
-      urlsToTry.push(inputUrl.replace(/\/dev$/, '/exec'));
-    } else if (inputUrl.endsWith('/exec')) {
-      urlsToTry.push(inputUrl.replace(/\/exec$/, '/dev'));
+      inputUrl = inputUrl.replace(/\/dev$/, '/exec');
     }
-
+    
+    const testUrl = inputUrl;
     let lastError: any = null;
 
-    for (const testUrl of urlsToTry) {
-      // 1. Try server-side proxy FIRST (100% reliable, zero CORS, follows Google 302 redirects)
-      try {
-        const fullUrl = testUrl.includes('?') ? `${testUrl}&action=get_all` : `${testUrl}?action=get_all`;
-        const proxyRes = await fetch(`/api/apps-script-proxy?url=${encodeURIComponent(fullUrl)}`);
-        if (proxyRes.ok) {
-          const result = await proxyRes.json();
-          const data = result.data || result;
+    // 1. Try server-side proxy FIRST (100% reliable, zero CORS, follows Google 302 redirects, safe from cross-origin script errors)
+    try {
+      const fullUrl = testUrl.includes('action=') 
+        ? testUrl 
+        : (testUrl.includes('?') ? `${testUrl}&action=get_all` : `${testUrl}?action=get_all`);
 
-          if (result.status === 'success' || data.products || data.pubgAccounts || data.ucPackages) {
-            this.saveConfig({ 
-              webAppUrl: testUrl,
-              lastSyncedAt: new Date().toLocaleString('ar-LY') 
-            });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
 
-            return {
-              products: Array.isArray(data.products) ? data.products : [],
-              pubgAccounts: Array.isArray(data.pubgAccounts) ? data.pubgAccounts : [],
-              allPubgAccounts: Array.isArray(data.allPubgAccounts) ? data.allPubgAccounts : data.pubgAccounts,
-              pubgSubmissions: Array.isArray(data.pubgSubmissions) ? data.pubgSubmissions : [],
-              ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
-              settings: data.settings || {},
-              deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
-              categories: Array.isArray(data.categories) ? data.categories : undefined,
-              adminCredentials: data.adminCredentials || (data.settings && data.settings.adminUsername ? { username: data.settings.adminUsername, password: data.settings.adminPassword } : undefined),
-            };
-          }
-        }
-      } catch (proxyErr: any) {
-        lastError = proxyErr;
-      }
+      const proxyRes = await fetch(`/api/apps-script-proxy?url=${encodeURIComponent(fullUrl)}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
 
-      // 2. Try standard GET fetch
-      try {
-        const fullUrl = testUrl.includes('?') ? `${testUrl}&action=get_all` : `${testUrl}?action=get_all`;
-        const res = await fetch(fullUrl, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-        });
-
-        if (res.ok) {
-          const result = await res.json();
-          const data = result.data || result;
-
-          if (result.status === 'success' || data.products || data.pubgAccounts || data.ucPackages) {
-            this.saveConfig({ 
-              webAppUrl: testUrl,
-              lastSyncedAt: new Date().toLocaleString('ar-LY') 
-            });
-
-            return {
-              products: Array.isArray(data.products) ? data.products : [],
-              pubgAccounts: Array.isArray(data.pubgAccounts) ? data.pubgAccounts : [],
-              allPubgAccounts: Array.isArray(data.allPubgAccounts) ? data.allPubgAccounts : data.pubgAccounts,
-              pubgSubmissions: Array.isArray(data.pubgSubmissions) ? data.pubgSubmissions : [],
-              ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
-              settings: data.settings || {},
-              deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
-              categories: Array.isArray(data.categories) ? data.categories : undefined,
-              adminCredentials: data.adminCredentials || (data.settings && data.settings.adminUsername ? { username: data.settings.adminUsername, password: data.settings.adminPassword } : undefined),
-            };
-          }
-        }
-      } catch (err: any) {
-        lastError = err;
-      }
-
-      // 3. Try JSONP fallback (bypasses all browser CORS and origin blocks across all devices)
-      try {
-        const result = await this.loadViaJsonp(testUrl);
+      if (proxyRes.ok) {
+        const result = await proxyRes.json();
         const data = result.data || result;
 
         if (result.status === 'success' || data.products || data.pubgAccounts || data.ucPackages) {
@@ -1690,9 +1574,52 @@ export class AppsScriptService {
             adminCredentials: data.adminCredentials || (data.settings && data.settings.adminUsername ? { username: data.settings.adminUsername, password: data.settings.adminPassword } : undefined),
           };
         }
-      } catch (jsonpErr: any) {
-        lastError = jsonpErr;
       }
+    } catch (proxyErr: any) {
+      lastError = proxyErr;
+    }
+
+    // 2. Fallback: Try direct browser fetch with safe AbortController (never injects script tags)
+    try {
+      const fullUrl = testUrl.includes('action=') 
+        ? testUrl 
+        : (testUrl.includes('?') ? `${testUrl}&action=get_all` : `${testUrl}?action=get_all`);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+
+      const res = await fetch(fullUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (res.ok) {
+        const result = await res.json();
+        const data = result.data || result;
+
+        if (result.status === 'success' || data.products || data.pubgAccounts || data.ucPackages) {
+          this.saveConfig({ 
+            webAppUrl: testUrl,
+            lastSyncedAt: new Date().toLocaleString('ar-LY') 
+          });
+
+          return {
+            products: Array.isArray(data.products) ? data.products : [],
+            pubgAccounts: Array.isArray(data.pubgAccounts) ? data.pubgAccounts : [],
+            allPubgAccounts: Array.isArray(data.allPubgAccounts) ? data.allPubgAccounts : data.pubgAccounts,
+            pubgSubmissions: Array.isArray(data.pubgSubmissions) ? data.pubgSubmissions : [],
+            ucPackages: Array.isArray(data.ucPackages) ? data.ucPackages : [],
+            settings: data.settings || {},
+            deliveryRates: Array.isArray(data.deliveryRates) ? data.deliveryRates : undefined,
+            categories: Array.isArray(data.categories) ? data.categories : undefined,
+            adminCredentials: data.adminCredentials || (data.settings && data.settings.adminUsername ? { username: data.settings.adminUsername, password: data.settings.adminPassword } : undefined),
+          };
+        }
+      }
+    } catch (err: any) {
+      lastError = err;
     }
 
     throw new Error(lastError?.message || 'فشل جلب البيانات من Google Sheets');

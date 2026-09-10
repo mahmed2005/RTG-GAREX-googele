@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Product, PubgAccount, UcPackage, CartItem, Order, StoreSettings, LibyanCity, PubgSellSubmission, DeliveryCityRate } from '../types';
 import { GoogleSheetsService } from '../services/googleSheets';
 import { AppsScriptService } from '../services/appsScript';
@@ -231,6 +231,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
 
   const [isAppsScriptSyncing, setIsAppsScriptSyncing] = useState(false);
+  const isRefreshingRef = useRef(false);
   const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
   const [dataLoadedMessage, setDataLoadedMessage] = useState<string | null>(null);
   const [hasShownLoadedToast, setHasShownLoadedToast] = useState(false);
@@ -426,6 +427,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
     };
 
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+
     try {
       setIsAppsScriptSyncing(true);
       const data = await AppsScriptService.fetchStoreData(config.webAppUrl);
@@ -469,7 +473,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       // Persist to IndexedDB
-      indexedDbService.saveAllStoreData(data);
+      indexedDbService.saveAllStoreData(data).catch(() => {});
 
       // Sync fetched Apps Script data to backend server cache
       const normalizedAccountsForSync = data.pubgAccounts ? normalizeAccounts(data.pubgAccounts) : [];
@@ -491,6 +495,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {
       console.warn('Could not auto-fetch from Google Apps Script:', e);
     } finally {
+      isRefreshingRef.current = false;
       setIsAppsScriptSyncing(false);
       setIsDataLoading(false);
     }
@@ -510,7 +515,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (Array.isArray(cached.categories)) setCategories(cached.categories);
         setIsDataLoading(false);
       }
-    });
+    }).catch(() => {});
 
     // 2. Immediate fetch from fast Node API (<500ms with GZIP)
     fetchServerData();
