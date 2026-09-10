@@ -32,10 +32,13 @@ export const GOOGLE_APPS_SCRIPT_TEMPLATE = `/**
 function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    setupSheetsIfMissing(ss);
-
     var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : 'get_all';
     var callback = (e && e.parameter && e.parameter.callback) ? e.parameter.callback : null;
+
+    // Fast-path: Only run setup on explicit setup action or if core sheets are missing
+    if (action === 'setup' || !ss.getSheetByName('المنتجات')) {
+      setupSheetsIfMissing(ss);
+    }
 
     if (action === 'get_all' || action === 'ping') {
       var data = getAllStoreData(ss);

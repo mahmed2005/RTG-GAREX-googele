@@ -4,17 +4,7 @@ export const INITIAL_PRODUCTS: Product[] = [];
 
 export const INITIAL_PUBG_ACCOUNTS: PubgAccount[] = [];
 
-export const INITIAL_UC_PACKAGES: UcPackage[] = [
-  {
-    id: 'uc-1787261945562',
-    ucAmount: 660,
-    bonusUc: 60,
-    price: 35,
-    isPopular: true,
-    isAvailable: true,
-    tag: 'شحن فوري بالـ ID',
-  },
-];
+export const INITIAL_UC_PACKAGES: UcPackage[] = [];
 
 export { LIBYAN_CITIES } from './libyanCities';
 

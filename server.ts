@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import compression from 'compression';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { 
@@ -86,8 +87,74 @@ function saveDatabase(db: StoreDatabase) {
 
 let db = loadDatabase();
 
+// Background sync from Google Apps Script to keep store-db.json fresh without slowing down frontend
+async function syncFromGoogleAppsScript() {
+  try {
+    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbyLT7CH_DtGvX63okgIsf-PqWLTgxJk9y2lwtxiv3WWhfT0PQwLB9n-647sg0d5SKSeOA/exec?action=get_all';
+    const response = await fetch(appsScriptUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 RTG-Store-Backend/1.0',
+      },
+    });
+
+    if (response.ok) {
+      const text = await response.text();
+      let result: any;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        const jsonpMatch = text.match(/^[a-zA-Z0-9_]+\s*\(\s*([\s\S]*)\s*\)\s*;?$/);
+        if (jsonpMatch && jsonpMatch[1]) {
+          try {
+            result = JSON.parse(jsonpMatch[1]);
+          } catch {}
+        }
+      }
+
+      const data = result?.data || result;
+      if (data && (Array.isArray(data.products) || Array.isArray(data.pubgAccounts) || Array.isArray(data.ucPackages))) {
+        let changed = false;
+        if (Array.isArray(data.products) && data.products.length > 0) {
+          db.products = data.products;
+          changed = true;
+        }
+        if (Array.isArray(data.pubgAccounts)) {
+          db.pubgAccounts = data.pubgAccounts;
+          changed = true;
+        }
+        if (Array.isArray(data.allPubgAccounts)) {
+          db.allPubgAccounts = data.allPubgAccounts;
+          changed = true;
+        }
+        if (Array.isArray(data.ucPackages)) {
+          db.ucPackages = data.ucPackages;
+          changed = true;
+        }
+        if (Array.isArray(data.deliveryRates)) {
+          db.deliveryRates = data.deliveryRates;
+          changed = true;
+        }
+        if (data.settings && typeof data.settings === 'object') {
+          db.settings = { ...db.settings, ...data.settings };
+          changed = true;
+        }
+        if (changed) {
+          saveDatabase(db);
+          console.log('[Apps Script Background Sync] Cache refreshed successfully. Products count:', db.products.length);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Apps Script Background Sync] Notice:', err);
+  }
+}
+
 async function startServer() {
   const app = express();
+  app.use(compression());
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
@@ -96,8 +163,9 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString(), productsCount: db.products.length });
   });
 
-  // GET Store Data (Available to all phones, PCs, tablets with zero CORS/Auth blocks)
+  // GET Store Data (Available to all phones, PCs, tablets with sub-second response, zero CORS/Auth blocks, GZIP compressed)
   app.get('/api/store', (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=60');
     res.json({
       status: 'success',
       products: db.products,
@@ -410,6 +478,14 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`RTG Gear X Server running at http://0.0.0.0:${PORT}`);
+    // Warm up Google Apps Script cache in background without blocking server boot
+    setTimeout(() => {
+      syncFromGoogleAppsScript();
+    }, 2000);
+    // Periodically keep in sync every 2 minutes
+    setInterval(() => {
+      syncFromGoogleAppsScript();
+    }, 120000);
   });
 }
 

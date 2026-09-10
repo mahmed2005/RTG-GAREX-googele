@@ -41,14 +41,15 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
       {isVisible && (
         <motion.div
           id="splash-screen"
+          onClick={() => setIsVisible(false)}
           initial={{ opacity: 1 }}
           exit={{ 
             opacity: 0,
-            y: -24,
-            filter: 'blur(10px)',
-            transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } 
+            y: -15,
+            filter: 'blur(6px)',
+            transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } 
           }}
-          className="fixed inset-0 z-[9999] bg-[#07080c] flex flex-col items-center justify-center px-6 overflow-hidden select-none"
+          className="fixed inset-0 z-[9999] bg-[#07080c] flex flex-col items-center justify-center px-6 overflow-hidden select-none cursor-pointer"
         >
           {/* Ambient Luxury Lighting / Glow Effects */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-gradient-to-tr from-red-600/15 via-rose-500/10 to-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
