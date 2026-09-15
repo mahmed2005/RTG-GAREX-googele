@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import compression from 'compression';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { 
@@ -78,15 +77,6 @@ function loadDatabase(): StoreDatabase {
 
 function saveDatabase(db: StoreDatabase) {
   try {
-    // Safety guard: Never overwrite an existing database that has products with an empty product list
-    if (fs.existsSync(DATA_FILE) && (!db.products || db.products.length === 0)) {
-      try {
-        const existing = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-        if (existing && Array.isArray(existing.products) && existing.products.length > 0) {
-          db.products = existing.products;
-        }
-      } catch {}
-    }
     db.lastUpdated = new Date().toISOString();
     fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2), 'utf8');
   } catch (e) {
@@ -96,79 +86,8 @@ function saveDatabase(db: StoreDatabase) {
 
 let db = loadDatabase();
 
-// Background sync from Google Apps Script to keep store-db.json fresh without slowing down frontend
-async function syncFromGoogleAppsScript() {
-  try {
-    const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbyLT7CH_DtGvX63okgIsf-PqWLTgxJk9y2lwtxiv3WWhfT0PQwLB9n-647sg0d5SKSeOA/exec?action=get_all';
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    const response = await fetch(appsScriptUrl, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 RTG-Store-Backend/1.0',
-      },
-    });
-    clearTimeout(timeout);
-
-    if (response.ok) {
-      const text = await response.text();
-      let result: any;
-      try {
-        result = JSON.parse(text);
-      } catch {
-        const jsonpMatch = text.match(/^[a-zA-Z0-9_]+\s*\(\s*([\s\S]*)\s*\)\s*;?$/);
-        if (jsonpMatch && jsonpMatch[1]) {
-          try {
-            result = JSON.parse(jsonpMatch[1]);
-          } catch {}
-        }
-      }
-
-      const data = result?.data || result;
-      if (data && (Array.isArray(data.products) || Array.isArray(data.pubgAccounts) || Array.isArray(data.ucPackages))) {
-        let changed = false;
-        if (Array.isArray(data.products) && data.products.length > 0) {
-          db.products = data.products;
-          changed = true;
-        }
-        if (Array.isArray(data.pubgAccounts)) {
-          db.pubgAccounts = data.pubgAccounts;
-          changed = true;
-        }
-        if (Array.isArray(data.allPubgAccounts)) {
-          db.allPubgAccounts = data.allPubgAccounts;
-          changed = true;
-        }
-        if (Array.isArray(data.ucPackages)) {
-          db.ucPackages = data.ucPackages;
-          changed = true;
-        }
-        if (Array.isArray(data.deliveryRates)) {
-          db.deliveryRates = data.deliveryRates;
-          changed = true;
-        }
-        if (data.settings && typeof data.settings === 'object') {
-          db.settings = { ...db.settings, ...data.settings };
-          changed = true;
-        }
-        if (changed) {
-          saveDatabase(db);
-          console.log('[Apps Script Background Sync] Cache refreshed successfully. Products count:', db.products.length);
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('[Apps Script Background Sync] Notice:', err);
-  }
-}
-
 async function startServer() {
   const app = express();
-  app.use(compression());
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
@@ -177,9 +96,8 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString(), productsCount: db.products.length });
   });
 
-  // GET Store Data (Available to all phones, PCs, tablets with sub-second response, zero CORS/Auth blocks, GZIP compressed)
+  // GET Store Data (Available to all phones, PCs, tablets with zero CORS/Auth blocks)
   app.get('/api/store', (req, res) => {
-    res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=60');
     res.json({
       status: 'success',
       products: db.products,
@@ -198,19 +116,19 @@ async function startServer() {
   app.post('/api/store/sync', (req, res) => {
     try {
       const { products, pubgAccounts, allPubgAccounts, ucPackages, deliveryRates, settings, pubgSubmissions } = req.body;
-      if (Array.isArray(products) && products.length > 0) {
+      if (Array.isArray(products)) {
         db.products = products;
       }
-      if (Array.isArray(pubgAccounts) && pubgAccounts.length > 0) {
+      if (Array.isArray(pubgAccounts)) {
         db.pubgAccounts = pubgAccounts;
       }
-      if (Array.isArray(allPubgAccounts) && allPubgAccounts.length > 0) {
+      if (Array.isArray(allPubgAccounts)) {
         db.allPubgAccounts = allPubgAccounts;
       }
-      if (Array.isArray(ucPackages) && ucPackages.length > 0) {
+      if (Array.isArray(ucPackages)) {
         db.ucPackages = ucPackages;
       }
-      if (Array.isArray(deliveryRates) && deliveryRates.length > 0) {
+      if (Array.isArray(deliveryRates)) {
         db.deliveryRates = deliveryRates;
       }
       if (Array.isArray(pubgSubmissions)) {
@@ -416,23 +334,15 @@ async function startServer() {
         return res.status(400).json({ status: 'error', message: 'Missing URL' });
       }
 
-      const fullUrl = targetUrl.includes('action=') 
-        ? targetUrl 
-        : (targetUrl.includes('?') ? `${targetUrl}&action=get_all` : `${targetUrl}?action=get_all`);
-
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
-
+      const fullUrl = targetUrl.includes('?') ? `${targetUrl}&action=get_all` : `${targetUrl}?action=get_all`;
       const response = await fetch(fullUrl, {
         method: 'GET',
         redirect: 'follow',
-        signal: controller.signal,
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         },
       });
-      clearTimeout(timer);
 
       const text = await response.text();
       try {
@@ -450,7 +360,8 @@ async function startServer() {
         res.send(text);
       }
     } catch (e: any) {
-      res.status(500).json({ status: 'error', message: e.message || 'Proxy request error' });
+      console.error('Apps Script GET proxy error:', e);
+      res.status(500).json({ status: 'error', message: e.message });
     }
   });
 
@@ -462,17 +373,12 @@ async function startServer() {
         return res.status(400).json({ status: 'error', message: 'Missing URL' });
       }
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
-
       const response = await fetch(url, {
         method: 'POST',
         redirect: 'follow',
-        signal: controller.signal,
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payload),
       });
-      clearTimeout(timer);
 
       const text = await response.text();
       try {
@@ -482,7 +388,8 @@ async function startServer() {
         res.json({ status: 'success', raw: text });
       }
     } catch (e: any) {
-      res.status(500).json({ status: 'error', message: e.message || 'Proxy request error' });
+      console.error('Apps Script POST proxy error:', e);
+      res.status(500).json({ status: 'error', message: e.message });
     }
   });
 
@@ -503,14 +410,6 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`RTG Gear X Server running at http://0.0.0.0:${PORT}`);
-    // Warm up Google Apps Script cache in background without blocking server boot
-    setTimeout(() => {
-      syncFromGoogleAppsScript();
-    }, 2000);
-    // Periodically keep in sync every 2 minutes
-    setInterval(() => {
-      syncFromGoogleAppsScript();
-    }, 120000);
   });
 }
 

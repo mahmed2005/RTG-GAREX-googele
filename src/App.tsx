@@ -61,10 +61,10 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#0b0c10] text-[#e0e2ec] flex flex-col font-['Cairo',sans-serif] selection:bg-red-600 selection:text-white">
-      {/* Swift Luxury Splash Screen on site open (<1s for instant access) */}
+      {/* 2.5s Luxury Splash Screen on site open */}
       {showSplash && (
         <SplashScreen
-          duration={800}
+          duration={2500}
           onComplete={() => setShowSplash(false)}
         />
       )}
