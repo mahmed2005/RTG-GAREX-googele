@@ -249,10 +249,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (!isDataLoading && !hasShownLoadedToast) {
       setHasShownLoadedToast(true);
-      setDataLoadedMessage('تم تحميل وتحديث المنتجات وحسابات ببجي وأسعار الشدات بنجاح! جميع المنتجات متوفرة الآن في الموقع.');
+      setDataLoadedMessage('تم عرض المنتجات، يمكنك الشراء الآن!');
       const timer = setTimeout(() => {
         setDataLoadedMessage(null);
-      }, 7000);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [isDataLoading, hasShownLoadedToast]);
@@ -364,14 +364,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Fetch live store data from backend API (/api/store) and optionally Google Apps Script
-  const fetchServerData = async () => {
+  const fetchServerData = async (): Promise<boolean> => {
     try {
       const res = await fetch('/api/store');
       if (res.ok) {
         const data = await res.json();
         if (data && data.status === 'success') {
-          if (Array.isArray(data.products)) {
+          let hasContent = false;
+          if (Array.isArray(data.products) && data.products.length > 0) {
             setProducts(data.products);
+            hasContent = true;
           }
           if (Array.isArray(data.pubgAccounts)) {
             setPubgAccounts(data.pubgAccounts);
@@ -382,26 +384,36 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (Array.isArray(data.ucPackages)) {
             setUcPackages(data.ucPackages);
           }
-          if (Array.isArray(data.deliveryRates)) {
+          if (Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
             setDeliveryRates(data.deliveryRates);
           }
           if (data.settings && typeof data.settings === 'object') {
             setSettings((prev) => ({ ...prev, ...data.settings }));
           }
+
+          // Unblock loading state immediately so products display in less than 1 second!
+          if (hasContent || Array.isArray(data.products)) {
+            setIsDataLoading(false);
+          }
+          return true;
         }
       }
     } catch (err) {
       console.warn('Local API fetch error:', err);
     }
+    return false;
   };
 
   // Fetch live store data from Google Apps Script Web App
   const refreshFromAppsScript = async () => {
-    // Always fetch unified server data first
+    // Always fetch unified server data first (instant response)
     await fetchServerData();
 
     const config = AppsScriptService.getConfig();
-    if (!config.webAppUrl) return;
+    if (!config.webAppUrl) {
+      setIsDataLoading(false);
+      return;
+    }
 
     // Helper to normalize PUBG accounts and ensure videoUrl is detected from any field (including storeReceivePhone if entered as Drive link)
     const normalizeAccounts = (accounts: PubgAccount[]): PubgAccount[] => {
@@ -489,20 +501,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Auto-fetch on mount, interval polling (every 15s), and window/tab focus
+  // Auto-fetch on mount, interval polling, and window/tab focus
   useEffect(() => {
-    // Immediate initial sync
+    // Immediate initial sync (instant server response first, background Apps Script sync second)
     fetchServerData();
     refreshFromAppsScript();
 
-    // Periodic sync so all visitors and devices stay updated in real time
-    const interval = setInterval(() => {
-      refreshFromAppsScript();
-    }, 15000);
+    // Fast local server poll every 25 seconds (zero lag, compressed, lightweight)
+    const serverInterval = setInterval(() => {
+      fetchServerData();
+    }, 25000);
 
-    // Refresh when user returns to tab or focuses the window
+    // Periodic Apps Script sync every 60 seconds
+    const appsScriptInterval = setInterval(() => {
+      refreshFromAppsScript();
+    }, 60000);
+
+    // Refresh immediately when user returns to tab or focuses window
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        fetchServerData();
         refreshFromAppsScript();
       }
     };
@@ -511,7 +529,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
-      clearInterval(interval);
+      clearInterval(serverInterval);
+      clearInterval(appsScriptInterval);
       window.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
     };

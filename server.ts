@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import compression from 'compression';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { 
@@ -86,18 +87,105 @@ function saveDatabase(db: StoreDatabase) {
 
 let db = loadDatabase();
 
+// Background Google Apps Script synchronizer (Server-Side)
+async function syncFromAppsScript() {
+  const targetUrl = db.appsScriptUrl || (db.settings && db.settings.appsScriptUrl) || 'https://script.google.com/macros/s/AKfycbyLT7CH_DtGvX63okgIsf-PqWLTgxJk9y2lwtxiv3WWhfT0PQwLB9n-647sg0d5SKSeOA/exec';
+  if (!targetUrl) return;
+
+  try {
+    const fullUrl = targetUrl.includes('?') ? `${targetUrl}&action=get_all` : `${targetUrl}?action=get_all`;
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      },
+    });
+
+    if (response.ok) {
+      const text = await response.text();
+      let data: any = null;
+      try {
+        const json = JSON.parse(text);
+        data = json.data || json;
+      } catch {
+        const jsonpMatch = text.match(/^[a-zA-Z0-9_]+\s*\(\s*([\s\S]*)\s*\)\s*;?$/);
+        if (jsonpMatch && jsonpMatch[1]) {
+          try {
+            const parsed = JSON.parse(jsonpMatch[1]);
+            data = parsed.data || parsed;
+          } catch {}
+        }
+      }
+
+      if (data && (Array.isArray(data.products) || Array.isArray(data.ucPackages) || Array.isArray(data.pubgAccounts))) {
+        if (Array.isArray(data.products) && data.products.length > 0) {
+          db.products = data.products;
+        }
+        if (Array.isArray(data.pubgAccounts)) {
+          db.pubgAccounts = data.pubgAccounts;
+        }
+        if (Array.isArray(data.allPubgAccounts)) {
+          db.allPubgAccounts = data.allPubgAccounts;
+        }
+        if (Array.isArray(data.pubgSubmissions)) {
+          db.pubgSubmissions = data.pubgSubmissions;
+        }
+        if (Array.isArray(data.ucPackages)) {
+          db.ucPackages = data.ucPackages;
+        }
+        if (Array.isArray(data.deliveryRates) && data.deliveryRates.length > 0) {
+          db.deliveryRates = data.deliveryRates;
+        }
+        if (data.settings && typeof data.settings === 'object') {
+          db.settings = { ...db.settings, ...data.settings };
+        }
+        saveDatabase(db);
+        console.log(`[Server AppsScript Sync] Success! Products: ${db.products.length}, UC Packages: ${db.ucPackages.length}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Server AppsScript Sync] Background sync warning:', err.message);
+  }
+}
+
 async function startServer() {
   const app = express();
+  
+  // Enable Gzip/Deflate compression for blazing fast data transfer over mobile networks
+  app.use(compression({
+    threshold: 1024, // compress anything over 1KB
+  }));
+
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+
+  // Kick off background sync 2 seconds after server starts
+  setTimeout(() => {
+    syncFromAppsScript();
+  }, 2000);
+
+  // Keep server in-memory database continuously synchronized with Google Sheets every 45 seconds
+  setInterval(() => {
+    syncFromAppsScript();
+  }, 45000);
 
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString(), productsCount: db.products.length });
   });
 
-  // GET Store Data (Available to all phones, PCs, tablets with zero CORS/Auth blocks)
+  // Trigger manual immediate background refresh from Google Apps Script
+  app.post('/api/store/refresh-from-sheet', async (req, res) => {
+    syncFromAppsScript().catch(() => {});
+    res.json({ status: 'success', message: 'Sync triggered' });
+  });
+
+  // GET Store Data (Available to all phones, PCs, tablets with zero CORS/Auth blocks, sub-second response)
   app.get('/api/store', (req, res) => {
+    // Set caching headers for optimal client performance while allowing immediate revalidation
+    res.setHeader('Cache-Control', 'public, max-age=10, stale-while-revalidate=60');
     res.json({
       status: 'success',
       products: db.products,
